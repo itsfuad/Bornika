@@ -70,7 +70,7 @@ macro_rules! consonant {
             vowel_link_after_consonant: $crate::utils::VowelLink::Allows,
         })
     };
-    
+
     // 2. Self-documenting custom rule for special contextual keys
     (
         after_vowel: $indep:expr => Chain::$chain_indep:ident, Vowel::$vowel_indep:ident,

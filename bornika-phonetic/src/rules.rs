@@ -42,79 +42,111 @@ const RULE_SPECS: &[RuleSpec] = &[
     (trigger!("kkh"), consonant!("ক্ষ")),
     (trigger!("R"), consonant!("ড়")),
     (trigger!("Rh", "RH"), consonant!("ঢ়")),
-    
     // Special rules
     (trigger!("x"), consonant!("ক্স")),
-    
     // --- Contextual Special Consonants ---
-    
+
     // z / Z: Natively 'য', Ja-phala '্য' if after consonant.
-    (trigger!("z", "Z"), consonant!(
-        after_vowel: "য" => Chain::Allows, Vowel::Allows, 
-        after_consonant: "্য" => Chain::Breaks, Vowel::Allows
-    )),
-
+    (
+        trigger!("z", "Z"),
+        consonant!(
+            after_vowel: "য" => Chain::Allows, Vowel::Allows,
+            after_consonant: "্য" => Chain::Breaks, Vowel::Allows
+        ),
+    ),
     // y / Y: Natively 'য়', Ja-phala '্য' if preceded by a consonant.
-    (trigger!("y", "Y"), consonant!(
-        after_vowel: "য়" => Chain::Allows, Vowel::Allows,
-        after_consonant: "্য" => Chain::Breaks, Vowel::Allows
-    )),
-
+    (
+        trigger!("y", "Y"),
+        consonant!(
+            after_vowel: "য়" => Chain::Allows, Vowel::Allows,
+            after_consonant: "্য" => Chain::Breaks, Vowel::Allows
+        ),
+    ),
     // --- The "W + Vowel" Phonetic Blocks ---
-    (trigger!("wa", "wA", "Wa", "WA"), consonant!(
-        after_vowel: "ওয়া" => Chain::Breaks, Vowel::Breaks,
-        after_consonant: "্বা" => Chain::Breaks, Vowel::Breaks
-    )),
-    (trigger!("wi", "Wi"), consonant!(
-        after_vowel: "ওয়ি" => Chain::Breaks, Vowel::Breaks,
-        after_consonant: "্বি" => Chain::Breaks, Vowel::Breaks
-    )),
-    (trigger!("wI", "WI", "wee", "Wee"), consonant!(
-        after_vowel: "ওয়ী" => Chain::Breaks, Vowel::Breaks,
-        after_consonant: "্বী" => Chain::Breaks, Vowel::Breaks
-    )),
-    (trigger!("wu", "Wu", "woo", "Woo"), consonant!(
-        after_vowel: "য়ু" => Chain::Breaks, Vowel::Breaks,
-        after_consonant: "্বু" => Chain::Breaks, Vowel::Breaks
-    )),
-    (trigger!("wU", "WU"), consonant!(
-        after_vowel: "য়ূ" => Chain::Breaks, Vowel::Breaks,
-        after_consonant: "্বূ" => Chain::Breaks, Vowel::Breaks
-    )),
-    (trigger!("wrri", "Wrri"), consonant!(
-        after_vowel: "ওয়ৃ" => Chain::Breaks, Vowel::Breaks,
-        after_consonant: "্বৃ" => Chain::Breaks, Vowel::Breaks
-    )),
-    (trigger!("we", "We", "wE", "WE"), consonant!(
-        after_vowel: "ওয়ে" => Chain::Breaks, Vowel::Breaks,
-        after_consonant: "্বে" => Chain::Breaks, Vowel::Breaks
-    )),
-    (trigger!("wo", "Wo", "wO", "WO"), consonant!(
-        after_vowel: "ওয়ো" => Chain::Breaks, Vowel::Breaks,
-        after_consonant: "্বো" => Chain::Breaks, Vowel::Breaks
-    )),
-    (trigger!("wOI", "WOI"), consonant!(
-        after_vowel: "ওয়ৈ" => Chain::Breaks, Vowel::Breaks,
-        after_consonant: "্বৈ" => Chain::Breaks, Vowel::Breaks
-    )),
-    (trigger!("wOU", "WOU"), consonant!(
-        after_vowel: "ওয়ৌ" => Chain::Breaks, Vowel::Breaks,
-        after_consonant: "্বৌ" => Chain::Breaks, Vowel::Breaks
-    )),
-    
+    (
+        trigger!("wa", "wA", "Wa", "WA"),
+        consonant!(
+            after_vowel: "ওয়া" => Chain::Breaks, Vowel::Breaks,
+            after_consonant: "্বা" => Chain::Breaks, Vowel::Breaks
+        ),
+    ),
+    (
+        trigger!("wi", "Wi"),
+        consonant!(
+            after_vowel: "ওয়ি" => Chain::Breaks, Vowel::Breaks,
+            after_consonant: "্বি" => Chain::Breaks, Vowel::Breaks
+        ),
+    ),
+    (
+        trigger!("wI", "WI", "wee", "Wee"),
+        consonant!(
+            after_vowel: "ওয়ী" => Chain::Breaks, Vowel::Breaks,
+            after_consonant: "্বী" => Chain::Breaks, Vowel::Breaks
+        ),
+    ),
+    (
+        trigger!("wu", "Wu", "woo", "Woo"),
+        consonant!(
+            after_vowel: "য়ু" => Chain::Breaks, Vowel::Breaks,
+            after_consonant: "্বু" => Chain::Breaks, Vowel::Breaks
+        ),
+    ),
+    (
+        trigger!("wU", "WU"),
+        consonant!(
+            after_vowel: "য়ূ" => Chain::Breaks, Vowel::Breaks,
+            after_consonant: "্বূ" => Chain::Breaks, Vowel::Breaks
+        ),
+    ),
+    (
+        trigger!("wrri", "Wrri"),
+        consonant!(
+            after_vowel: "ওয়ৃ" => Chain::Breaks, Vowel::Breaks,
+            after_consonant: "্বৃ" => Chain::Breaks, Vowel::Breaks
+        ),
+    ),
+    (
+        trigger!("we", "We", "wE", "WE"),
+        consonant!(
+            after_vowel: "ওয়ে" => Chain::Breaks, Vowel::Breaks,
+            after_consonant: "্বে" => Chain::Breaks, Vowel::Breaks
+        ),
+    ),
+    (
+        trigger!("wo", "Wo", "wO", "WO"),
+        consonant!(
+            after_vowel: "ওয়ো" => Chain::Breaks, Vowel::Breaks,
+            after_consonant: "্বো" => Chain::Breaks, Vowel::Breaks
+        ),
+    ),
+    (
+        trigger!("wOI", "WOI"),
+        consonant!(
+            after_vowel: "ওয়ৈ" => Chain::Breaks, Vowel::Breaks,
+            after_consonant: "্বৈ" => Chain::Breaks, Vowel::Breaks
+        ),
+    ),
+    (
+        trigger!("wOU", "WOU"),
+        consonant!(
+            after_vowel: "ওয়ৌ" => Chain::Breaks, Vowel::Breaks,
+            after_consonant: "্বৌ" => Chain::Breaks, Vowel::Breaks
+        ),
+    ),
     // w / W Fallback: If 'w' is typed ALONE.
-    (trigger!("w", "W"), consonant!(
-        after_vowel: "ও" => Chain::Breaks, Vowel::Breaks,
-        after_consonant: "্ব" => Chain::Breaks, Vowel::Allows
-    )),
-
+    (
+        trigger!("w", "W"),
+        consonant!(
+            after_vowel: "ও" => Chain::Breaks, Vowel::Breaks,
+            after_consonant: "্ব" => Chain::Breaks, Vowel::Allows
+        ),
+    ),
     // Signs
     (trigger!("t`"), sign("ৎ")),
     (trigger!("ng", "nG"), sign("ং")),
     (trigger!(":"), sign("ঃ")),
     (trigger!("^"), sign("ঁ")),
     (trigger!(",,"), sign("্")),
-    
     // Vowels
     (trigger!("o"), vowel("অ", "")),
     (trigger!("a", "A"), vowel("আ", "া")),
@@ -128,12 +160,10 @@ const RULE_SPECS: &[RuleSpec] = &[
     (trigger!("O"), vowel("ও", "ো")),
     (trigger!("OU"), vowel("ঔ", "ৌ")),
     (trigger!("oo"), vowel("উ", "ু")),
-    
     // Punctuation
     (trigger!("."), punctuation("।")),
     (trigger!(".."), punctuation(".")),
     (trigger!(":`"), punctuation(":")),
-    
     // Special Trigger
     (trigger!("`"), TokenType::ForceSeparate),
 ];

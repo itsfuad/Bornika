@@ -24,18 +24,22 @@ pub struct KeyEvent {
 pub enum KeyAction {
     Bypass,
     Swallow,
-    Commit { text: String, bypass_key: bool },
-    UpdatePreedit { text: String, cursor_pos: u32, visible: bool },
-    ToggleMode { bangla_mode: bool },
+    Commit {
+        text: String,
+        bypass_key: bool,
+    },
+    UpdatePreedit {
+        text: String,
+        cursor_pos: u32,
+        visible: bool,
+    },
+    ToggleMode {
+        bangla_mode: bool,
+    },
 }
 
 fn is_composition_char(c: char) -> bool {
-    c.is_ascii_alphanumeric()
-        || c == '`'
-        || c == '.'
-        || c == '^'
-        || c == ':'
-        || c == ','
+    c.is_ascii_alphanumeric() || c == '`' || c == '.' || c == '^' || c == ':' || c == ','
 }
 
 fn is_commit_punctuation(c: char) -> bool {
@@ -113,7 +117,9 @@ impl PhoneticEngine {
             if cleared {
                 self.clear();
             }
-            return KeyAction::ToggleMode { bangla_mode: self.bangla_mode };
+            return KeyAction::ToggleMode {
+                bangla_mode: self.bangla_mode,
+            };
         }
 
         if !bangla_mode {
@@ -184,7 +190,7 @@ pub fn translate(input: &str) -> String {
     let chars: Vec<char> = input.chars().collect();
     let len = chars.len();
     let mut i = 0;
-    
+
     // State trackers mapping directly to the Chain and VowelLink data models
     let mut can_take_dependent_vowel = false;
     let mut can_form_conjunct = false;
@@ -192,17 +198,20 @@ pub fn translate(input: &str) -> String {
     while i < len {
         let mut matched = false;
         let remaining_slice = &chars[i..];
-        
+
         for rule in rules::RULES {
             let rule_len = rule.roman.chars().count();
-            if remaining_slice.len() >= rule_len && 
-               remaining_slice[..rule_len].iter().collect::<String>() == rule.roman {
-                
+            if remaining_slice.len() >= rule_len
+                && remaining_slice[..rule_len].iter().collect::<String>() == rule.roman
+            {
                 matched = true;
                 i += rule_len;
-                
+
                 match &rule.token_type {
-                    rules::TokenType::Vowel { independent, dependent } => {
+                    rules::TokenType::Vowel {
+                        independent,
+                        dependent,
+                    } => {
                         if can_take_dependent_vowel {
                             output.push_str(dependent);
                         } else {
@@ -215,11 +224,13 @@ pub fn translate(input: &str) -> String {
                         if can_form_conjunct {
                             output.push_str(forms.after_consonant);
                             can_form_conjunct = forms.chain_after_consonant == utils::Chain::Allows;
-                            can_take_dependent_vowel = forms.vowel_link_after_consonant == utils::VowelLink::Allows;
+                            can_take_dependent_vowel =
+                                forms.vowel_link_after_consonant == utils::VowelLink::Allows;
                         } else {
                             output.push_str(forms.after_vowel);
                             can_form_conjunct = forms.chain_after_vowel == utils::Chain::Allows;
-                            can_take_dependent_vowel = forms.vowel_link_after_vowel == utils::VowelLink::Allows;
+                            can_take_dependent_vowel =
+                                forms.vowel_link_after_vowel == utils::VowelLink::Allows;
                         }
                     }
                     rules::TokenType::Exact(val) => {
@@ -246,7 +257,7 @@ pub fn translate(input: &str) -> String {
                 break;
             }
         }
-        
+
         if !matched {
             let next_char = chars[i];
             output.push(next_char);
@@ -255,7 +266,7 @@ pub fn translate(input: &str) -> String {
             can_form_conjunct = false;
         }
     }
-    
+
     output
 }
 
@@ -338,7 +349,7 @@ mod tests {
 
     #[test]
     fn test_z_contextual() {
-        assert_eq!(translate("oZaDmin"), "অযাড্মিন"); 
+        assert_eq!(translate("oZaDmin"), "অযাড্মিন");
         assert_eq!(translate("kZ"), "ক্য");
         assert_eq!(translate("kZa"), "ক্যা");
         assert_eq!(translate("oZa"), "অযা");
@@ -349,10 +360,10 @@ mod tests {
         // standalone w produces ও
         assert_eq!(translate("w"), "ও");
         // w followed by vowel breaks link -> ও + independent vowel
-        assert_eq!(translate("wi"), "ওই"); 
-        assert_eq!(translate("wa"), "ওআ"); 
-        
-        // consonant + w produces ba-phala 
+        assert_eq!(translate("wi"), "ওই");
+        assert_eq!(translate("wa"), "ওআ");
+
+        // consonant + w produces ba-phala
         assert_eq!(translate("kw"), "ক্ব");
         // consonant + w + vowel allows vowel link -> ba-phala + kar
         assert_eq!(translate("kwa"), "ক্বা");

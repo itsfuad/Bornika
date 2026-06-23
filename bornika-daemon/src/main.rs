@@ -1,8 +1,8 @@
+use crate::dbus_interface::{IBusEngine, IBusFactory};
 use std::env;
 use std::fs;
 use std::path::PathBuf;
 use zbus::ConnectionBuilder;
-use crate::dbus_interface::{IBusEngine, IBusFactory};
 
 mod dbus_interface;
 
@@ -47,7 +47,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ibus_addr = get_ibus_address().ok_or(
         "Could not locate active IBus D-Bus socket address. Please verify that ibus-daemon is running."
     )?;
-    crate::dbus_interface::log_info(&format!("Bornika: Discovered active IBus address: {}", ibus_addr));
+    crate::dbus_interface::log_info(&format!(
+        "Bornika: Discovered active IBus address: {}",
+        ibus_addr
+    ));
 
     // 2. Build D-Bus connection and register services on IBus session
     let _connection = ConnectionBuilder::address(ibus_addr.as_str())?
@@ -57,7 +60,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()
         .await?;
 
-    crate::dbus_interface::log_info("Bornika: Native Rust IME engine successfully registered on D-Bus. Active.");
+    crate::dbus_interface::log_info(
+        "Bornika: Native Rust IME engine successfully registered on D-Bus. Active.",
+    );
 
     println!("Bornika: Native Rust IME engine successfully registered on IBus. Waiting for active inputs...");
 
