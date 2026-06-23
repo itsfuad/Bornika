@@ -1,10 +1,24 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Chain {
+    Allows,
+    Breaks,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ConsonantForms {
+    pub after_vowel: &'static str,
+    pub after_consonant: &'static str,
+    pub chain_after_vowel: Chain,
+    pub chain_after_consonant: Chain,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenType {
     Vowel {
         independent: &'static str,
         dependent: &'static str,
     },
-    Consonant(&'static str),
+    Consonant(ConsonantForms),
     Sign(&'static str),
     ForceSeparate,
     Punctuation(&'static str),
@@ -35,15 +49,38 @@ macro_rules! trigger {
 
 pub(crate) use trigger;
 
+macro_rules! consonant {
+    // 1. Standard consonant (auto-generates hasant form, allows chaining)
+    ($char:expr) => {
+        $crate::utils::TokenType::Consonant($crate::utils::ConsonantForms {
+            after_vowel: $char,
+            after_consonant: concat!("্", $char),
+            chain_after_vowel: $crate::utils::Chain::Allows,
+            chain_after_consonant: $crate::utils::Chain::Allows,
+        })
+    };
+    
+    // 2. Self-documenting custom rule for special contextual keys
+    (
+        after_vowel: $indep:expr => $chain_indep:ident,
+        after_consonant: $conj:expr => $chain_conj:ident
+    ) => {
+        $crate::utils::TokenType::Consonant($crate::utils::ConsonantForms {
+            after_vowel: $indep,
+            after_consonant: $conj,
+            chain_after_vowel: $crate::utils::Chain::$chain_indep,
+            chain_after_consonant: $crate::utils::Chain::$chain_conj,
+        })
+    };
+}
+
+pub(crate) use consonant;
+
 pub(crate) const fn vowel(independent: &'static str, dependent: &'static str) -> TokenType {
     TokenType::Vowel {
         independent,
         dependent,
     }
-}
-
-pub(crate) const fn consonant(value: &'static str) -> TokenType {
-    TokenType::Consonant(value)
 }
 
 pub(crate) const fn sign(value: &'static str) -> TokenType {
@@ -202,11 +239,4 @@ const fn is_ascii(value: &'static str) -> bool {
     }
 
     true
-}
-
-pub fn is_consonant(c: char) -> bool {
-    let u = c as u32;
-    // Standard Bengali consonants are in range U+0995 to U+09B9
-    // Also include U+09AF (ya), U+09DC (rra), U+09DD (rha), U+09DF (yya)
-    (0x0995..=0x09B9).contains(&u) || u == 0x09AF || u == 0x09DC || u == 0x09DD || u == 0x09DF
 }

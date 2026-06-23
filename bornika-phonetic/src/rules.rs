@@ -1,4 +1,4 @@
-pub use crate::utils::{is_consonant, Rule, TokenType};
+pub use crate::utils::{Rule, TokenType, Chain};
 
 use crate::utils::{
     consonant, count_rules, expand_rules, punctuation, sign, sort_rules, trigger, vowel, RuleSpec,
@@ -6,51 +6,72 @@ use crate::utils::{
 
 // Keep this list easy to edit. RULES below expands aliases and sorts matches at compile time.
 const RULE_SPECS: &[RuleSpec] = &[
-    (trigger!("k", "K"), consonant("ক")),
-    (trigger!("kh", "kH", "Kh", "KH"), consonant("খ")),
-    (trigger!("g", "G"), consonant("গ")),
-    (trigger!("gh", "gH", "Gh", "GH"), consonant("ঘ")),
-    (trigger!("Ng"), consonant("ঙ")),
-    (trigger!("c", "C"), consonant("চ")),
-    (trigger!("ch", "cH", "Ch", "CH"), consonant("ছ")),
-    (trigger!("j", "J"), consonant("জ")),
-    (trigger!("jh", "jH", "Jh", "JH"), consonant("ঝ")),
-    (trigger!("NG"), consonant("ঞ")),
-    (trigger!("T"), consonant("ট")),
-    (trigger!("Th", "TH"), consonant("ঠ")),
-    (trigger!("D"), consonant("ড")),
-    (trigger!("Dh", "DH"), consonant("ঢ")),
-    (trigger!("N"), consonant("ণ")),
-    (trigger!("t"), consonant("ত")),
-    (trigger!("th", "tH"), consonant("থ")),
-    (trigger!("d"), consonant("দ")),
-    (trigger!("dh", "dH"), consonant("ধ")),
-    (trigger!("n"), consonant("ন")),
-    (trigger!("p", "P"), consonant("প")),
-    (trigger!("f", "F", "ph", "pH", "Ph", "PH"), consonant("ফ")),
-    (trigger!("b", "B", "w"), consonant("ব")),
-    (trigger!("v", "V", "bh", "bH", "Bh", "BH"), consonant("ভ")),
-    (trigger!("m", "M"), consonant("ম")),
-    (trigger!("z"), consonant("য")),
-    (trigger!("r", "rr"), consonant("র")),
-    (trigger!("l", "L"), consonant("ল")),
-    (trigger!("S"), consonant("শ")),
-    (trigger!("sh", "sH"), consonant("শ")),
-    (trigger!("Sh", "SH"), consonant("ষ")),
-    (trigger!("s"), consonant("স")),
-    (trigger!("h", "H"), consonant("হ")),
-    (trigger!("kkh"), consonant("ক্ষ")),
-    (trigger!("R"), consonant("ড়")),
-    (trigger!("Rh", "RH"), consonant("ঢ়")),
-    (trigger!("y", "Y"), consonant("য়")), // Special rules apply in translate.
+    (trigger!("k", "K"), consonant!("ক")),
+    (trigger!("kh", "kH", "Kh", "KH"), consonant!("খ")),
+    (trigger!("g", "G"), consonant!("গ")),
+    (trigger!("gh", "gH", "Gh", "GH"), consonant!("ঘ")),
+    (trigger!("Ng"), consonant!("ঙ")),
+    (trigger!("c", "C"), consonant!("চ")),
+    (trigger!("ch", "cH", "Ch", "CH"), consonant!("ছ")),
+    (trigger!("j", "J"), consonant!("জ")),
+    (trigger!("jh", "jH", "Jh", "JH"), consonant!("ঝ")),
+    (trigger!("NG"), consonant!("ঞ")),
+    (trigger!("T"), consonant!("ট")),
+    (trigger!("Th", "TH"), consonant!("ঠ")),
+    (trigger!("D"), consonant!("ড")),
+    (trigger!("Dh", "DH"), consonant!("ঢ")),
+    (trigger!("N"), consonant!("ণ")),
+    (trigger!("t"), consonant!("ত")),
+    (trigger!("th", "tH"), consonant!("থ")),
+    (trigger!("d"), consonant!("দ")),
+    (trigger!("dh", "dH"), consonant!("ধ")),
+    (trigger!("n"), consonant!("ন")),
+    (trigger!("p", "P"), consonant!("প")),
+    (trigger!("f", "F", "ph", "pH", "Ph", "PH"), consonant!("ফ")),
+    (trigger!("b", "B"), consonant!("ব")),
+    (trigger!("v", "V", "bh", "bH", "Bh", "BH"), consonant!("ভ")),
+    (trigger!("m", "M"), consonant!("ম")),
+    (trigger!("r"), consonant!("র")),
+    (trigger!("l", "L"), consonant!("ল")),
+    (trigger!("S"), consonant!("শ")),
+    (trigger!("sh", "sH"), consonant!("শ")),
+    (trigger!("Sh", "SH"), consonant!("ষ")),
+    (trigger!("s"), consonant!("স")),
+    (trigger!("h", "H"), consonant!("হ")),
+    (trigger!("kkh"), consonant!("ক্ষ")),
+    (trigger!("R"), consonant!("ড়")),
+    (trigger!("Rh", "RH"), consonant!("ঢ়")),
+    
+    // Special rules
+    (trigger!("x"), consonant!("ক্স")),
+    
+    // --- Contextual Special Consonants ---
+    
+    // z / Z: Both do the exact same thing. Natively 'য', Ja-phala '্য' if after consonant.
+    (trigger!("z", "Z"), consonant!(
+        after_vowel: "য" => Allows, 
+        after_consonant: "্য" => Breaks
+    )),
+
+    // y / Y: Natively 'য়', Ja-phala '্য' if preceded by a consonant.
+    (trigger!("y", "Y"), consonant!(
+        after_vowel: "য়" => Allows,
+        after_consonant: "্য" => Breaks
+    )),
+    
+    // w / W: Natively 'O', ba-phala '্ব' if preceded by a consonant.
+    (trigger!("w", "W"), consonant!(
+        after_vowel: "ও" => Breaks,
+        after_consonant: "্ব" => Breaks
+    )),
+
+    // Signs
     (trigger!("t`"), sign("ৎ")),
     (trigger!("ng", "nG"), sign("ং")),
     (trigger!(":"), sign("ঃ")),
     (trigger!("^"), sign("ঁ")),
     (trigger!(",,"), sign("্")),
-    (trigger!("Z"), consonant("্য")),
-    // Special rules
-    (trigger!("x"), consonant("ক্স")),
+    
     // Vowels
     (trigger!("o"), vowel("অ", "")),
     (trigger!("a", "A"), vowel("আ", "া")),
@@ -64,10 +85,12 @@ const RULE_SPECS: &[RuleSpec] = &[
     (trigger!("O"), vowel("ও", "ো")),
     (trigger!("OU"), vowel("ঔ", "ৌ")),
     (trigger!("oo"), vowel("উ", "ু")),
+    
     // Punctuation
     (trigger!("."), punctuation("।")),
     (trigger!(".."), punctuation(".")),
     (trigger!(":`"), punctuation(":")),
+    
     // Special Trigger
     (trigger!("`"), TokenType::ForceSeparate),
 ];
@@ -102,6 +125,8 @@ mod tests {
         assert_eq!(token_type_for("l"), token_type_for("L"));
         assert_eq!(token_type_for("h"), token_type_for("H"));
         assert_eq!(token_type_for("y"), token_type_for("Y"));
+        assert_eq!(token_type_for("w"), token_type_for("W"));
+        assert_eq!(token_type_for("z"), token_type_for("Z"));
     }
 
     fn token_type_for(roman: &str) -> Option<TokenType> {
