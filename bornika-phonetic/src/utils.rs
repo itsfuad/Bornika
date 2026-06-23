@@ -5,11 +5,19 @@ pub enum Chain {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VowelLink {
+    Allows,
+    Breaks,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ConsonantForms {
     pub after_vowel: &'static str,
     pub after_consonant: &'static str,
     pub chain_after_vowel: Chain,
     pub chain_after_consonant: Chain,
+    pub vowel_link_after_vowel: VowelLink,
+    pub vowel_link_after_consonant: VowelLink,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -22,6 +30,7 @@ pub enum TokenType {
     Sign(&'static str),
     ForceSeparate,
     Punctuation(&'static str),
+    Exact(&'static str),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,19 +66,23 @@ macro_rules! consonant {
             after_consonant: concat!("্", $char),
             chain_after_vowel: $crate::utils::Chain::Allows,
             chain_after_consonant: $crate::utils::Chain::Allows,
+            vowel_link_after_vowel: $crate::utils::VowelLink::Allows,
+            vowel_link_after_consonant: $crate::utils::VowelLink::Allows,
         })
     };
     
     // 2. Self-documenting custom rule for special contextual keys
     (
-        after_vowel: $indep:expr => $chain_indep:ident,
-        after_consonant: $conj:expr => $chain_conj:ident
+        after_vowel: $indep:expr => Chain::$chain_indep:ident, Vowel::$vowel_indep:ident,
+        after_consonant: $conj:expr => Chain::$chain_conj:ident, Vowel::$vowel_conj:ident
     ) => {
         $crate::utils::TokenType::Consonant($crate::utils::ConsonantForms {
             after_vowel: $indep,
             after_consonant: $conj,
             chain_after_vowel: $crate::utils::Chain::$chain_indep,
             chain_after_consonant: $crate::utils::Chain::$chain_conj,
+            vowel_link_after_vowel: $crate::utils::VowelLink::$vowel_indep,
+            vowel_link_after_consonant: $crate::utils::VowelLink::$vowel_conj,
         })
     };
 }

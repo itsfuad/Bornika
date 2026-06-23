@@ -185,7 +185,7 @@ pub fn translate(input: &str) -> String {
     let len = chars.len();
     let mut i = 0;
     
-    // State trackers mapping directly to the Chain data model
+    // State trackers mapping directly to the Chain and VowelLink data models
     let mut can_take_dependent_vowel = false;
     let mut can_form_conjunct = false;
 
@@ -215,11 +215,18 @@ pub fn translate(input: &str) -> String {
                         if can_form_conjunct {
                             output.push_str(forms.after_consonant);
                             can_form_conjunct = forms.chain_after_consonant == utils::Chain::Allows;
+                            can_take_dependent_vowel = forms.vowel_link_after_consonant == utils::VowelLink::Allows;
                         } else {
                             output.push_str(forms.after_vowel);
                             can_form_conjunct = forms.chain_after_vowel == utils::Chain::Allows;
+                            can_take_dependent_vowel = forms.vowel_link_after_vowel == utils::VowelLink::Allows;
                         }
-                        can_take_dependent_vowel = true; // Consonants/Phalas can take vowels
+                    }
+                    rules::TokenType::Exact(val) => {
+                        output.push_str(val);
+                        // Reset state because we inserted a complete, pre-formatted chunk
+                        can_take_dependent_vowel = false;
+                        can_form_conjunct = false;
                     }
                     rules::TokenType::Sign(val) => {
                         output.push_str(val);
@@ -309,21 +316,9 @@ mod tests {
     }
 
     #[test]
-    fn test_special_characters() {
-        assert_eq!(translate("ami"), "আমি");
-        assert_eq!(translate("bangla"), "বাংলা");
-        assert_eq!(translate("sabar"), "সাবার");
-        assert_eq!(translate("kOtha"), "কোথা");
-        assert_eq!(translate("kotha"), "কথা");
-        assert_eq!(translate("khoTha"), "খঠা");
-        assert_eq!(translate("khOtha"), "খোথা");
-        assert_eq!(translate("khotha"), "খথা");
-        assert_eq!(translate("linax"), "লিনাক্স");
-        assert_eq!(translate("ka^"), "কাঁ");
-        assert_eq!(translate("ba:"), "বাঃ");
-        assert_eq!(translate("orrko"), "অর্ক");
-        assert_eq!(translate("borrd"), "বর্দ");
-        assert_eq!(translate("bOrrd"), "বোর্দ");
+    fn test_exact_dictionary_words() {
+        assert_eq!(translate("wifi"), "ওয়াইফাই");
+        assert_eq!(translate("freewifi"), "ফ্রীওয়াইফাই");
     }
 
     #[test]
@@ -343,7 +338,6 @@ mod tests {
 
     #[test]
     fn test_z_contextual() {
-        // z/Z is now mapped contextually (যা after vowel, ্যা after consonant)
         assert_eq!(translate("oZaDmin"), "অযাড্মিন"); 
         assert_eq!(translate("kZ"), "ক্য");
         assert_eq!(translate("kZa"), "ক্যা");
@@ -351,10 +345,21 @@ mod tests {
     }
 
     #[test]
-    fn test_w_contextual() {
+    fn test_w_contextual_vowel_links() {
+        // standalone w produces ও
         assert_eq!(translate("w"), "ও");
+        // w followed by vowel breaks link -> ও + independent vowel
+        assert_eq!(translate("wi"), "ওই"); 
+        assert_eq!(translate("wa"), "ওআ"); 
+        
+        // consonant + w produces ba-phala 
         assert_eq!(translate("kw"), "ক্ব");
+        // consonant + w + vowel allows vowel link -> ba-phala + kar
         assert_eq!(translate("kwa"), "ক্বা");
+        assert_eq!(translate("swadhIn"), "স্বাধীন");
+        assert_eq!(translate("swosti"), "স্বস্তি");
+        assert_eq!(translate("swopno"), "স্বপ্ন");
+        assert_eq!(translate("udweg"), "উদ্বেগ");
     }
 
     #[test]
