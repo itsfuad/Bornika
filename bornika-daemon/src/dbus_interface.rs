@@ -1,20 +1,23 @@
-use std::sync::Mutex;
-use std::collections::HashMap;
-use zbus::{dbus_interface, SignalContext};
-use zbus::zvariant::{ObjectPath, Value};
 use bornika_phonetic::PhoneticEngine;
+use std::collections::HashMap;
+use std::sync::Mutex;
+use zbus::zvariant::{ObjectPath, Value};
+use zbus::{dbus_interface, SignalContext};
 
 pub fn log_info(msg: &str) {
     use std::fs::OpenOptions;
     use std::io::Write;
-    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open("/tmp/bornika.log") {
+    if let Ok(mut file) = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("/tmp/bornika.log")
+    {
         let _ = writeln!(file, "{}", msg);
     }
 }
 
-
 /// Dynamically constructs the exact GVariant wire layout expected by the IBus daemon.
-/// 
+///
 /// In IBus, all serializable objects must be wrapped in an IBusSerializable envelope:
 /// Signature: (sa{sv}sv)
 ///   1. "IBusText" (class name: s)
@@ -25,11 +28,7 @@ pub fn create_ibus_text(text: &str) -> Value<'static> {
     // 1. Build the inner IBusAttrList (empty for default style)
     let attr_attachments = HashMap::<String, Value<'static>>::new();
     let attr_properties = Vec::<Value<'static>>::new();
-    let attr_list_struct = (
-        "IBusAttrList",
-        attr_attachments,
-        attr_properties,
-    );
+    let attr_list_struct = ("IBusAttrList", attr_attachments, attr_properties);
     let attr_list_variant = Value::new(attr_list_struct);
 
     // 2. Build the outer IBusText
@@ -61,20 +60,16 @@ pub fn create_ibus_text_styled(text: &str) -> Value<'static> {
         let attr_struct = (
             "IBusAttribute",
             attr_attachments,
-            1u32, // IBUS_ATTR_TYPE_UNDERLINE
-            1u32, // IBUS_ATTR_UNDERLINE_SINGLE
-            0i32, // start_index
+            1u32,              // IBUS_ATTR_TYPE_UNDERLINE
+            1u32,              // IBUS_ATTR_UNDERLINE_SINGLE
+            0i32,              // start_index
             text.len() as i32, // end_index in bytes
         );
         attr_properties.push(Value::new(attr_struct));
     }
 
     let attr_attachments = HashMap::<String, Value<'static>>::new();
-    let attr_list_struct = (
-        "IBusAttrList",
-        attr_attachments,
-        attr_properties,
-    );
+    let attr_list_struct = ("IBusAttrList", attr_attachments, attr_properties);
     let attr_list_variant = Value::new(attr_list_struct);
 
     let text_attachments = HashMap::<String, Value<'static>>::new();
@@ -96,7 +91,10 @@ pub struct IBusFactory;
 impl IBusFactory {
     #[dbus_interface(name = "CreateEngine")]
     async fn create_engine(&self, name: String) -> zbus::fdo::Result<ObjectPath<'_>> {
-        log_info(&format!("IBusFactory: CreateEngine called for engine: {}", name));
+        log_info(&format!(
+            "IBusFactory: CreateEngine called for engine: {}",
+            name
+        ));
         Ok(ObjectPath::from_static_str("/org/freedesktop/IBus/Engine/bornika").unwrap())
     }
 }
@@ -149,7 +147,10 @@ impl IBusEngine {
 
     #[dbus_interface(name = "SetCursorLocation")]
     async fn set_cursor_location(&self, x: i32, y: i32, w: i32, h: i32) {
-        log_info(&format!("Engine: SetCursorLocation (x: {}, y: {}, w: {}, h: {})", x, y, w, h));
+        log_info(&format!(
+            "Engine: SetCursorLocation (x: {}, y: {}, w: {}, h: {})",
+            x, y, w, h
+        ));
     }
 
     #[dbus_interface(name = "SetCapabilities")]
@@ -205,7 +206,10 @@ impl IBusEngine {
             bornika_phonetic::KeyAction::Bypass => false,
             bornika_phonetic::KeyAction::Swallow => true,
             bornika_phonetic::KeyAction::ToggleMode { bangla_mode } => {
-                log_info(&format!("Engine: Toggled Bangla typing mode to {}", bangla_mode));
+                log_info(&format!(
+                    "Engine: Toggled Bangla typing mode to {}",
+                    bangla_mode
+                ));
                 let empty_text = create_ibus_text("");
                 let _ = Self::update_preedit_text(&ctxt, empty_text, 0, false, 0).await;
                 true
@@ -217,7 +221,11 @@ impl IBusEngine {
                 let _ = Self::commit_text(&ctxt, val_text).await;
                 !bypass_key
             }
-            bornika_phonetic::KeyAction::UpdatePreedit { text, cursor_pos, visible } => {
+            bornika_phonetic::KeyAction::UpdatePreedit {
+                text,
+                cursor_pos,
+                visible,
+            } => {
                 let styled_text = create_ibus_text_styled(&text);
                 let _ = Self::update_preedit_text(&ctxt, styled_text, cursor_pos, visible, 0).await;
                 true

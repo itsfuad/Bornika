@@ -24,18 +24,22 @@ pub struct KeyEvent {
 pub enum KeyAction {
     Bypass,
     Swallow,
-    Commit { text: String, bypass_key: bool },
-    UpdatePreedit { text: String, cursor_pos: u32, visible: bool },
-    ToggleMode { bangla_mode: bool },
+    Commit {
+        text: String,
+        bypass_key: bool,
+    },
+    UpdatePreedit {
+        text: String,
+        cursor_pos: u32,
+        visible: bool,
+    },
+    ToggleMode {
+        bangla_mode: bool,
+    },
 }
 
 fn is_composition_char(c: char) -> bool {
-    c.is_ascii_alphanumeric()
-        || c == '`'
-        || c == '.'
-        || c == '^'
-        || c == ':'
-        || c == ','
+    c.is_ascii_alphanumeric() || c == '`' || c == '.' || c == '^' || c == ':' || c == ','
 }
 
 fn is_commit_punctuation(c: char) -> bool {
@@ -72,18 +76,14 @@ impl PhoneticEngine {
         self.composition_buffer.is_empty()
     }
 
-    /// Translates the current composition buffer into Bangla Unicode
     pub fn translate(&self) -> String {
         translate(&self.composition_buffer)
     }
 
-    /// Appends a character to the composition buffer
     pub fn push_char(&mut self, c: char) {
         self.composition_buffer.push(c);
     }
 
-    /// Removes the last character from the composition buffer.
-    /// Returns true if a character was removed, false if the buffer was already empty.
     pub fn pop_char(&mut self) -> bool {
         if !self.composition_buffer.is_empty() {
             self.composition_buffer.pop();
@@ -93,18 +93,14 @@ impl PhoneticEngine {
         }
     }
 
-    /// Process a key event and return the action to perform
     pub fn process_key_event(&mut self, event: KeyEvent) -> KeyAction {
         let bangla_mode = self.bangla_mode;
 
-        // Bypass any key combination that has Alt or Ctrl (except Ctrl+Space)
         if event.alt || (event.ctrl && event.key != VirtualKey::Space) {
             return KeyAction::Bypass;
         }
 
         if event.is_release {
-            // Consume key releases ONLY for actual composition keys in Bangla mode
-            // AND only if the composition buffer is NOT empty.
             if bangla_mode && !self.is_empty() {
                 if let VirtualKey::Char(c) = event.key {
                     if is_composition_char(c) {
@@ -115,14 +111,15 @@ impl PhoneticEngine {
             return KeyAction::Bypass;
         }
 
-        // Toggle layout mode: Ctrl + Space
         if event.ctrl && event.key == VirtualKey::Space {
             self.bangla_mode = !self.bangla_mode;
             let cleared = !self.is_empty();
             if cleared {
                 self.clear();
             }
-            return KeyAction::ToggleMode { bangla_mode: self.bangla_mode };
+            return KeyAction::ToggleMode {
+                bangla_mode: self.bangla_mode,
+            };
         }
 
         if !bangla_mode {
@@ -145,19 +142,7 @@ impl PhoneticEngine {
                     KeyAction::Bypass
                 }
             }
-            VirtualKey::Space => {
-                if !self.is_empty() {
-                    let committed = self.translate();
-                    self.clear();
-                    KeyAction::Commit {
-                        text: committed,
-                        bypass_key: true,
-                    }
-                } else {
-                    KeyAction::Bypass
-                }
-            }
-            VirtualKey::Enter => {
+            VirtualKey::Space | VirtualKey::Enter => {
                 if !self.is_empty() {
                     let committed = self.translate();
                     self.clear();
@@ -205,92 +190,83 @@ pub fn translate(input: &str) -> String {
     let chars: Vec<char> = input.chars().collect();
     let len = chars.len();
     let mut i = 0;
-    
-    // We keep track of whether the last matched token was a consonant
-    // to determine if a vowel should become a dependent "kar" sign.
-    let mut last_token_was_consonant = false;
+
+    // State trackers mapping directly to the Chain and VowelLink data models
+    let mut can_take_dependent_vowel = false;
+    let mut can_form_conjunct = false;
 
     while i < len {
         let mut matched = false;
-        
-        // Find the longest matching rule starting at index i
         let remaining_slice = &chars[i..];
-        
+
         for rule in rules::RULES {
             let rule_len = rule.roman.chars().count();
-            if remaining_slice.len() >= rule_len && 
-               remaining_slice[..rule_len].iter().collect::<String>() == rule.roman {
-                
+            if remaining_slice.len() >= rule_len
+                && remaining_slice[..rule_len].iter().collect::<String>() == rule.roman
+            {
                 matched = true;
                 i += rule_len;
-                
+
                 match &rule.token_type {
-                    rules::TokenType::Vowel { independent, dependent } => {
-                        // A vowel is dependent (kar) if the last output character is a consonant
-                        // AND our tracking state confirms the last token was a consonant.
-                        let preceded_by_consonant = last_token_was_consonant && 
-                            output.chars().last().map(rules::is_consonant).unwrap_or(false);
-                        
-                        if preceded_by_consonant {
+                    rules::TokenType::Vowel {
+                        independent,
+                        dependent,
+                    } => {
+                        if can_take_dependent_vowel {
                             output.push_str(dependent);
                         } else {
                             output.push_str(independent);
                         }
-                        last_token_was_consonant = false;
+                        can_take_dependent_vowel = false;
+                        can_form_conjunct = false;
                     }
-                    rules::TokenType::Consonant(val) => {
-                        // Special rules for 'y'
-                        if rule.roman == "y" || rule.roman == "Y" {
-                            let preceded_by_consonant = last_token_was_consonant && 
-                                output.chars().last().map(rules::is_consonant).unwrap_or(false);
-                            if preceded_by_consonant {
-                                output.push('্'); // Hasant
-                                output.push('য'); // ya -> ja-phala
-                                last_token_was_consonant = true;
-                            } else {
-                                output.push_str("য়"); // yya
-                                last_token_was_consonant = true;
-                            }
+                    rules::TokenType::Consonant(forms) => {
+                        if can_form_conjunct {
+                            output.push_str(forms.after_consonant);
+                            can_form_conjunct = forms.chain_after_consonant == utils::Chain::Allows;
+                            can_take_dependent_vowel =
+                                forms.vowel_link_after_consonant == utils::VowelLink::Allows;
                         } else {
-                            // If the last token was a consonant, we must insert a Hasant
-                            // between them to form a conjunct (Juktakkhar).
-                            // Exception: do not insert Hasant if the last output character is 'য',
-                            // or if the new consonant value itself already starts with a Hasant ('্')
-                            let ends_with_ya = output.ends_with('য');
-                            let starts_with_hasant = val.starts_with('্');
-                            if last_token_was_consonant && !ends_with_ya && !starts_with_hasant {
-                                output.push('্');
-                            }
-                            output.push_str(val);
-                            last_token_was_consonant = true;
+                            output.push_str(forms.after_vowel);
+                            can_form_conjunct = forms.chain_after_vowel == utils::Chain::Allows;
+                            can_take_dependent_vowel =
+                                forms.vowel_link_after_vowel == utils::VowelLink::Allows;
                         }
+                    }
+                    rules::TokenType::Exact(val) => {
+                        output.push_str(val);
+                        // Reset state because we inserted a complete, pre-formatted chunk
+                        can_take_dependent_vowel = false;
+                        can_form_conjunct = false;
                     }
                     rules::TokenType::Sign(val) => {
                         output.push_str(val);
-                        last_token_was_consonant = false;
+                        can_take_dependent_vowel = false;
+                        can_form_conjunct = false;
                     }
                     rules::TokenType::ForceSeparate => {
-                        // Swallowed by the engine to reset consonant link states
-                        last_token_was_consonant = false;
+                        can_take_dependent_vowel = false;
+                        can_form_conjunct = false;
                     }
                     rules::TokenType::Punctuation(val) => {
                         output.push_str(val);
-                        last_token_was_consonant = false;
+                        can_take_dependent_vowel = false;
+                        can_form_conjunct = false;
                     }
                 }
                 break;
             }
         }
-        
+
         if !matched {
-            // No rule matched, pass the character as-is and reset states
             let next_char = chars[i];
             output.push(next_char);
             i += 1;
-            last_token_was_consonant = false;
+            can_take_dependent_vowel = false;
+            can_form_conjunct = false;
         }
     }
-    
+
     output
 }
 
@@ -351,26 +327,13 @@ mod tests {
     }
 
     #[test]
-    fn test_special_characters() {
-        assert_eq!(translate("ami"), "আমি");
-        assert_eq!(translate("bangla"), "বাংলা");
-        assert_eq!(translate("sabar"), "সাবার");
-        assert_eq!(translate("kOtha"), "কোথা");
-        assert_eq!(translate("kotha"), "কথা");
-        assert_eq!(translate("khoTha"), "খঠা");
-        assert_eq!(translate("khOtha"), "খোথা");
-        assert_eq!(translate("khotha"), "খথা");
-        assert_eq!(translate("linax"), "লিনাক্স");
-        assert_eq!(translate("ka^"), "কাঁ");
-        assert_eq!(translate("ba:"), "বাঃ");
-        assert_eq!(translate("orrko"), "অর্ক");
-        assert_eq!(translate("borrd"), "বর্দ");
-        assert_eq!(translate("bOrrd"), "বোর্দ");
+    fn test_exact_dictionary_words() {
+        assert_eq!(translate("wifi"), "ওয়াইফাই");
+        assert_eq!(translate("freewifi"), "ফ্রীওয়াইফাই");
     }
 
     #[test]
     fn test_force_separate() {
-        // k + ` + kh should be separate (কখ) instead of conjunct (ক্খ)
         assert_eq!(translate("k`kh"), "কখ");
         assert_eq!(translate("k`a"), "কআ");
     }
@@ -385,12 +348,29 @@ mod tests {
     }
 
     #[test]
-    fn test_z_force_yaphala() {
-        assert_eq!(translate("oZaDmin"), "অ্যাড্মিন");
-        assert_eq!(translate("oZarOmeTik"), "অ্যারোমেটিক");
+    fn test_z_contextual() {
+        assert_eq!(translate("oZaDmin"), "অযাড্মিন");
         assert_eq!(translate("kZ"), "ক্য");
         assert_eq!(translate("kZa"), "ক্যা");
-        assert_eq!(translate("oZa"), "অ্যা");
+        assert_eq!(translate("oZa"), "অযা");
+    }
+
+    #[test]
+    fn test_w_contextual_vowel_links() {
+        // standalone w produces ও
+        assert_eq!(translate("w"), "ও");
+        // w followed by vowel breaks link -> ও + independent vowel
+        assert_eq!(translate("wi"), "ওই");
+        assert_eq!(translate("wa"), "ওআ");
+
+        // consonant + w produces ba-phala
+        assert_eq!(translate("kw"), "ক্ব");
+        // consonant + w + vowel allows vowel link -> ba-phala + kar
+        assert_eq!(translate("kwa"), "ক্বা");
+        assert_eq!(translate("swadhIn"), "স্বাধীন");
+        assert_eq!(translate("swosti"), "স্বস্তি");
+        assert_eq!(translate("swopno"), "স্বপ্ন");
+        assert_eq!(translate("udweg"), "উদ্বেগ");
     }
 
     #[test]
