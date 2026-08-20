@@ -46,7 +46,7 @@ Bornika follows the standard Avro phonetic transliteration guidelines:
 | `N` | ণ | `t` | ত | `th` | থ |
 | `d` | দ | `dh` | ধ | `n` | ন |
 | `p` | প | `ph` / `f` | ফ | `b` | ব |
-| `bh` / `v` | ভ | `m` | ম | `z` | য |
+| `bh` / `v` | ভ | `m` | ম | `z` / `Z` | য / য-ফলা |
 | `r` | র | `l` | ল | `S` / `sh` | শ |
 | `Sh` | ষ | `s` | স | `h` | হ |
 | `R` | ড় | `Rh` | ঢ় | `y` / `Y` | য় / য-ফলা |

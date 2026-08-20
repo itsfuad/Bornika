@@ -32,7 +32,16 @@ const RULE_SPECS: &[RuleSpec] = &[
     (trigger!("b", "B"), consonant!("ব")),
     (trigger!("v", "V", "bh", "bH", "Bh", "BH"), consonant!("ভ")),
     (trigger!("m", "M"), consonant!("ম")),
-    (trigger!("r", "rr"), consonant!("র")),
+    (trigger!("r"), consonant!("র")),
+    // rr / Reph: after a vowel it emits র্ and lets the following consonant
+    // start normally, rather than making that consonant a conjunct tail.
+    (
+        trigger!("rr"),
+        consonant!(
+            after_vowel: "র্" => Chain::Breaks, Vowel::Breaks,
+            after_consonant: "্র" => Chain::Breaks, Vowel::Breaks
+        ),
+    ),
     (trigger!("l", "L"), consonant!("ল")),
     (trigger!("S"), consonant!("শ")),
     (trigger!("sh", "sH"), consonant!("শ")),
@@ -46,11 +55,19 @@ const RULE_SPECS: &[RuleSpec] = &[
     (trigger!("x"), consonant!("ক্স")),
     // --- Contextual Special Consonants ---
 
-    // z / Z: Natively 'য', Ja-phala '্য' if after consonant.
+    // z: Natively 'য', Ja-phala '্য' if after consonant.
     (
-        trigger!("z", "Z"),
+        trigger!("z"),
         consonant!(
             after_vowel: "য" => Chain::Allows, Vowel::Allows,
+            after_consonant: "্য" => Chain::Breaks, Vowel::Allows
+        ),
+    ),
+    // Z: forced Ja-phala, including after vowels for words like অ্যা.
+    (
+        trigger!("Z"),
+        consonant!(
+            after_vowel: "্য" => Chain::Breaks, Vowel::Allows,
             after_consonant: "্য" => Chain::Breaks, Vowel::Allows
         ),
     ),
@@ -141,8 +158,14 @@ const RULE_SPECS: &[RuleSpec] = &[
             after_consonant: "্ব" => Chain::Breaks, Vowel::Allows
         ),
     ),
-    // Signs
-    (trigger!("t`"), sign("ৎ")),
+    // t` is standalone ৎ, but joins a preceding consonant with a hasant.
+    (
+        trigger!("t`"),
+        consonant!(
+            after_vowel: "ৎ" => Chain::Breaks, Vowel::Breaks,
+            after_consonant: "্ৎ" => Chain::Breaks, Vowel::Breaks
+        ),
+    ),
     (trigger!("ng", "nG"), sign("ং")),
     (trigger!(":"), sign("ঃ")),
     (trigger!("^"), sign("ঁ")),
@@ -196,7 +219,6 @@ mod tests {
         assert_eq!(token_type_for("v"), token_type_for("V"));
         assert_eq!(token_type_for("y"), token_type_for("Y"));
         assert_eq!(token_type_for("w"), token_type_for("W"));
-        assert_eq!(token_type_for("z"), token_type_for("Z"));
         assert_eq!(token_type_for("we"), token_type_for("WE"));
     }
 

@@ -327,6 +327,14 @@ mod tests {
     }
 
     #[test]
+    fn test_ta_sign_after_reph() {
+        assert_eq!(translate("t`"), "ৎ");
+        assert_eq!(translate("vorrt`"), "ভর্ৎ");
+        assert_eq!(translate("vort`sonapUrrNo"), "ভর্ৎসনাপূর্ণ");
+        assert_eq!(translate("orrko"), "অর্ক");
+    }
+
+    #[test]
     fn test_exact_dictionary_words() {
         assert_eq!(translate("wifi"), "ওয়াইফাই");
         assert_eq!(translate("freewifi"), "ফ্রীওয়াইফাই");
@@ -349,10 +357,12 @@ mod tests {
 
     #[test]
     fn test_z_contextual() {
-        assert_eq!(translate("oZaDmin"), "অযাড্মিন");
+        assert_eq!(translate("oZaDmin"), "অ্যাড্মিন");
+        assert_eq!(translate("oZambulens"), "অ্যাম্বুলেন্স");
         assert_eq!(translate("kZ"), "ক্য");
         assert_eq!(translate("kZa"), "ক্যা");
-        assert_eq!(translate("oZa"), "অযা");
+        assert_eq!(translate("oZa"), "অ্যা");
+        assert_eq!(translate("oza"), "অযা");
     }
 
     #[test]
