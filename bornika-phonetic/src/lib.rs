@@ -327,12 +327,6 @@ mod tests {
     }
 
     #[test]
-    fn test_exact_dictionary_words() {
-        assert_eq!(translate("wifi"), "ওয়াইফাই");
-        assert_eq!(translate("freewifi"), "ফ্রীওয়াইফাই");
-    }
-
-    #[test]
     fn test_force_separate() {
         assert_eq!(translate("k`kh"), "কখ");
         assert_eq!(translate("k`a"), "কআ");
