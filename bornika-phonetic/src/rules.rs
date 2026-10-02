@@ -160,6 +160,17 @@ const RULE_SPECS: &[RuleSpec] = &[
     (trigger!("O"), vowel("ও", "ো")),
     (trigger!("OU"), vowel("ঔ", "ৌ")),
     (trigger!("oo"), vowel("উ", "ু")),
+    // Bengali numerals
+    (trigger!("0"), TokenType::Exact("০")),
+    (trigger!("1"), TokenType::Exact("১")),
+    (trigger!("2"), TokenType::Exact("২")),
+    (trigger!("3"), TokenType::Exact("৩")),
+    (trigger!("4"), TokenType::Exact("৪")),
+    (trigger!("5"), TokenType::Exact("৫")),
+    (trigger!("6"), TokenType::Exact("৬")),
+    (trigger!("7"), TokenType::Exact("৭")),
+    (trigger!("8"), TokenType::Exact("৮")),
+    (trigger!("9"), TokenType::Exact("৯")),
     // Punctuation
     (trigger!("."), punctuation("।")),
     (trigger!(".."), punctuation(".")),
