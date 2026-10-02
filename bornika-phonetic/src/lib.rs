@@ -359,13 +359,33 @@ mod tests {
     fn test_w_contextual_vowel_links() {
         // standalone w produces ও
         assert_eq!(translate("w"), "ও");
-        // w followed by vowel breaks link -> ও + independent vowel
-        assert_eq!(translate("wi"), "ওই");
-        assert_eq!(translate("wa"), "ওআ");
 
-        // consonant + w produces ba-phala
+        // w followed by a vowel composes from the normal vowel rules, except wa
+        assert_eq!(translate("wi"), "ওই");
+        assert_eq!(translate("wI"), "ওঈ");
+        assert_eq!(translate("wee"), "ওঈ");
+        assert_eq!(translate("wu"), "ওউ");
+        assert_eq!(translate("wU"), "ওঊ");
+        assert_eq!(translate("wrri"), "ওঋ");
+        assert_eq!(translate("we"), "ওএ");
+        assert_eq!(translate("wo"), "ওঅ");
+        assert_eq!(translate("wO"), "ওও");
+        assert_eq!(translate("wOI"), "ওঐ");
+        assert_eq!(translate("wOU"), "ওঔ");
+        assert_eq!(translate("wa"), "ওয়া");
+
+        // after a consonant, w produces ba-phala and allows a following kar
         assert_eq!(translate("kw"), "ক্ব");
-        // consonant + w + vowel allows vowel link -> ba-phala + kar
+        assert_eq!(translate("kwi"), "ক্বি");
+        assert_eq!(translate("kwI"), "ক্বী");
+        assert_eq!(translate("kwu"), "ক্বু");
+        assert_eq!(translate("kwU"), "ক্বূ");
+        assert_eq!(translate("kwrri"), "ক্বৃ");
+        assert_eq!(translate("kwe"), "ক্বে");
+        assert_eq!(translate("kwo"), "ক্ব");
+        assert_eq!(translate("kwO"), "ক্বো");
+        assert_eq!(translate("kwOI"), "ক্বৈ");
+        assert_eq!(translate("kwOU"), "ক্বৌ");
         assert_eq!(translate("kwa"), "ক্বা");
         assert_eq!(translate("swadhIn"), "স্বাধীন");
         assert_eq!(translate("swosti"), "স্বস্তি");
