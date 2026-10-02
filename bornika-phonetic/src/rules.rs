@@ -62,75 +62,12 @@ const RULE_SPECS: &[RuleSpec] = &[
             after_consonant: "্য" => Chain::Breaks, Vowel::Allows
         ),
     ),
-    // --- The "W + Vowel" Phonetic Blocks ---
+    // --- Special W + Vowel Phonetic Block ---
     (
         trigger!("wa", "wA", "Wa", "WA"),
         consonant!(
             after_vowel: "ওয়া" => Chain::Breaks, Vowel::Breaks,
             after_consonant: "্বা" => Chain::Breaks, Vowel::Breaks
-        ),
-    ),
-    (
-        trigger!("wi", "Wi"),
-        consonant!(
-            after_vowel: "ওয়ি" => Chain::Breaks, Vowel::Breaks,
-            after_consonant: "্বি" => Chain::Breaks, Vowel::Breaks
-        ),
-    ),
-    (
-        trigger!("wI", "WI", "wee", "Wee"),
-        consonant!(
-            after_vowel: "ওয়ী" => Chain::Breaks, Vowel::Breaks,
-            after_consonant: "্বী" => Chain::Breaks, Vowel::Breaks
-        ),
-    ),
-    (
-        trigger!("wu", "Wu", "woo", "Woo"),
-        consonant!(
-            after_vowel: "য়ু" => Chain::Breaks, Vowel::Breaks,
-            after_consonant: "্বু" => Chain::Breaks, Vowel::Breaks
-        ),
-    ),
-    (
-        trigger!("wU", "WU"),
-        consonant!(
-            after_vowel: "য়ূ" => Chain::Breaks, Vowel::Breaks,
-            after_consonant: "্বূ" => Chain::Breaks, Vowel::Breaks
-        ),
-    ),
-    (
-        trigger!("wrri", "Wrri"),
-        consonant!(
-            after_vowel: "ওয়ৃ" => Chain::Breaks, Vowel::Breaks,
-            after_consonant: "্বৃ" => Chain::Breaks, Vowel::Breaks
-        ),
-    ),
-    (
-        trigger!("we", "We", "wE", "WE"),
-        consonant!(
-            after_vowel: "ওয়ে" => Chain::Breaks, Vowel::Breaks,
-            after_consonant: "্বে" => Chain::Breaks, Vowel::Breaks
-        ),
-    ),
-    (
-        trigger!("wo", "Wo", "wO", "WO"),
-        consonant!(
-            after_vowel: "ওয়ো" => Chain::Breaks, Vowel::Breaks,
-            after_consonant: "্বো" => Chain::Breaks, Vowel::Breaks
-        ),
-    ),
-    (
-        trigger!("wOI", "WOI"),
-        consonant!(
-            after_vowel: "ওয়ৈ" => Chain::Breaks, Vowel::Breaks,
-            after_consonant: "্বৈ" => Chain::Breaks, Vowel::Breaks
-        ),
-    ),
-    (
-        trigger!("wOU", "WOU"),
-        consonant!(
-            after_vowel: "ওয়ৌ" => Chain::Breaks, Vowel::Breaks,
-            after_consonant: "্বৌ" => Chain::Breaks, Vowel::Breaks
         ),
     ),
     // w / W Fallback: If 'w' is typed ALONE.
