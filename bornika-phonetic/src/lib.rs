@@ -392,6 +392,13 @@ mod tests {
     }
 
     #[test]
+    fn test_bengali_numerals() {
+        assert_eq!(translate("0123456789"), "০১২৩৪৫৬৭৮৯");
+        assert_eq!(translate("ami123"), "আমি১২৩");
+        assert_eq!(translate("2026."), "২০২৬।");
+    }
+
+    #[test]
     fn test_punctuation() {
         assert_eq!(translate("ami."), "আমি।");
         assert_eq!(translate("ami.."), "আমি.");
