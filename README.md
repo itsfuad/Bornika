@@ -74,11 +74,11 @@ This script automatically:
 3. Registers the Bornika engine template at `/usr/share/ibus/component/bornika.xml` (requires one-time `sudo` authentication to copy to the system directory).
 4. Restarts the active IBus daemon session to load the engine.
 
-### Building from Source
+### Build and Install from Source
 If you prefer to compile and install Bornika from source, you will need the Rust toolchain (Cargo & Rustc) installed. Clone the repository and run:
 
 ```bash
-./build.sh
+./install-local.sh
 ```
 
 ---
