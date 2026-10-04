@@ -8,7 +8,7 @@ echo "============================================="
 # 1. Download the latest pre-built binary
 echo "--> Downloading latest pre-built binary..."
 mkdir -p /tmp/bornika-install
-curl -fsSL -o /tmp/bornika-install/bornika-daemon.tar.gz "https://github.com/itsfuad/OpenBN/releases/latest/download/bornika-daemon.tar.gz"
+curl -fsSL -o /tmp/bornika-install/bornika-daemon.tar.gz "https://github.com/itsfuad/Bornika/releases/latest/download/bornika-daemon.tar.gz"
 
 # 2. Extract binary
 echo "--> Extracting binary..."
@@ -25,7 +25,7 @@ chmod +x "$HOME/.local/bin/bornika-daemon"
 
 # 4. Download and deploy IBus component XML
 echo "--> Downloading IBus component XML template..."
-curl -fsSL -o /tmp/bornika-install/bornika.xml.template "https://raw.githubusercontent.com/itsfuad/OpenBN/main/component/bornika.xml.template"
+curl -fsSL -o /tmp/bornika-install/bornika.xml.template "https://raw.githubusercontent.com/itsfuad/Bornika/main/component/bornika.xml.template"
 
 echo "--> Generating bornika.xml with home directory: $HOME"
 sed "s|__HOME__|${HOME}|g" /tmp/bornika-install/bornika.xml.template > /tmp/bornika-install/bornika.xml
