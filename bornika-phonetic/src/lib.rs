@@ -327,6 +327,55 @@ mod tests {
     }
 
     #[test]
+    fn test_khanda_ta_preserves_preceding_conjunct() {
+        assert_eq!(translate("vorrt`sonapUrrNo"), "ভর্ৎসনাপূর্ণ");
+        assert_eq!(translate("t`"), "ৎ");
+        assert_eq!(translate("ut`sob"), "উৎসব");
+        assert_eq!(translate("t`a"), "ৎআ");
+        assert_eq!(translate("r`t`"), "রৎ");
+        assert_eq!(translate("borrD"), "বর্ড");
+    }
+
+    #[test]
+    fn test_manual_typing_khanda_ta_conjunct() {
+        let mut engine = PhoneticEngine::new();
+        for c in "vorrt`sonapUrrNo".chars() {
+            let action = engine.process_key_event(KeyEvent {
+                key: VirtualKey::Char(c),
+                ctrl: false,
+                alt: false,
+                shift: c.is_ascii_uppercase(),
+                is_release: false,
+            });
+            if c == '`' {
+                assert_eq!(
+                    action,
+                    KeyAction::UpdatePreedit {
+                        text: "ভর্ৎ".into(),
+                        cursor_pos: 4,
+                        visible: true,
+                    }
+                );
+            }
+        }
+        assert_eq!(engine.translate(), "ভর্ৎসনাপূর্ণ");
+        assert_eq!(
+            engine.process_key_event(KeyEvent {
+                key: VirtualKey::Space,
+                ctrl: false,
+                alt: false,
+                shift: false,
+                is_release: false,
+            }),
+            KeyAction::Commit {
+                text: "ভর্ৎসনাপূর্ণ".into(),
+                bypass_key: true,
+            }
+        );
+        assert!(engine.is_empty());
+    }
+
+    #[test]
     fn test_force_separate() {
         assert_eq!(translate("k`kh"), "কখ");
         assert_eq!(translate("k`a"), "কআ");

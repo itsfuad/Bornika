@@ -78,8 +78,15 @@ const RULE_SPECS: &[RuleSpec] = &[
             after_consonant: "্ব" => Chain::Breaks, Vowel::Allows
         ),
     ),
+    // Khanda ta accepts a preceding conjunct, but cannot link to following letters.
+    (
+        trigger!("t`"),
+        consonant!(
+            after_vowel: "ৎ" => Chain::Breaks, Vowel::Breaks,
+            after_consonant: "্ৎ" => Chain::Breaks, Vowel::Breaks
+        ),
+    ),
     // Signs
-    (trigger!("t`"), sign("ৎ")),
     (trigger!("ng", "nG"), sign("ং")),
     (trigger!(":"), sign("ঃ")),
     (trigger!("^"), sign("ঁ")),

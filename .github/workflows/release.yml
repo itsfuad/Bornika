@@ -17,6 +17,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Check release notes
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: test -s "releases/${RELEASE_TAG}.md"
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
@@ -38,5 +43,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: target/release/bornika-daemon.tar.gz
+          body_path: releases/${{ github.ref_name }}.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
