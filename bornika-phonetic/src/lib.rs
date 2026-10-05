@@ -6,6 +6,8 @@ pub mod rules;
 pub enum VirtualKey {
     Char(char),
     Backspace,
+    Escape,
+    Tab,
     Space,
     Enter,
     Other,
@@ -94,14 +96,15 @@ impl PhoneticEngine {
     }
 
     pub fn process_key_event(&mut self, event: KeyEvent) -> KeyAction {
-        let bangla_mode = self.bangla_mode;
-
-        if event.alt || (event.ctrl && event.key != VirtualKey::Space) {
+        if event.alt
+            || (event.ctrl && event.key != VirtualKey::Space)
+            || (event.shift && matches!(event.key, VirtualKey::Escape | VirtualKey::Tab))
+        {
             return KeyAction::Bypass;
         }
 
         if event.is_release {
-            if bangla_mode && !self.is_empty() {
+            if self.bangla_mode && !self.is_empty() {
                 if let VirtualKey::Char(c) = event.key {
                     if is_composition_char(c) {
                         return KeyAction::Swallow;
@@ -122,64 +125,53 @@ impl PhoneticEngine {
             };
         }
 
-        if !bangla_mode {
+        if !self.bangla_mode {
             return KeyAction::Bypass;
         }
 
-        match event.key {
+        if matches!(
+            event.key,
+            VirtualKey::Space | VirtualKey::Enter | VirtualKey::Tab
+        ) || matches!(event.key, VirtualKey::Char(c) if is_commit_punctuation(c))
+        {
+            if self.is_empty() {
+                return KeyAction::Bypass;
+            }
+            let text = self.translate();
+            self.clear();
+            return KeyAction::Commit {
+                text,
+                bypass_key: event.key != VirtualKey::Tab,
+            };
+        }
+
+        let preedit = match event.key {
             VirtualKey::Backspace => {
-                if !self.is_empty() {
-                    self.pop_char();
-                    let preedit = self.translate();
-                    let cursor_pos = preedit.chars().count() as u32;
-                    let visible = !preedit.is_empty();
-                    KeyAction::UpdatePreedit {
-                        text: preedit,
-                        cursor_pos,
-                        visible,
-                    }
-                } else {
-                    KeyAction::Bypass
+                if !self.pop_char() {
+                    return KeyAction::Bypass;
                 }
+                self.translate()
             }
-            VirtualKey::Space | VirtualKey::Enter => {
-                if !self.is_empty() {
-                    let committed = self.translate();
-                    self.clear();
-                    KeyAction::Commit {
-                        text: committed,
-                        bypass_key: true,
-                    }
-                } else {
-                    KeyAction::Bypass
+            VirtualKey::Escape => {
+                if self.is_empty() {
+                    return KeyAction::Bypass;
                 }
+                self.clear();
+                String::new()
             }
-            VirtualKey::Char(c) => {
-                if is_composition_char(c) {
-                    self.push_char(c);
-                    let preedit = self.translate();
-                    let cursor_pos = preedit.chars().count() as u32;
-                    KeyAction::UpdatePreedit {
-                        text: preedit,
-                        cursor_pos,
-                        visible: true,
-                    }
-                } else if is_commit_punctuation(c) {
-                    if !self.is_empty() {
-                        let committed = self.translate();
-                        self.clear();
-                        KeyAction::Commit {
-                            text: committed,
-                            bypass_key: true,
-                        }
-                    } else {
-                        KeyAction::Bypass
-                    }
-                } else {
-                    KeyAction::Bypass
-                }
+            VirtualKey::Char(c) if is_composition_char(c) => {
+                self.push_char(c);
+                self.translate()
             }
-            VirtualKey::Other => KeyAction::Bypass,
+            _ => return KeyAction::Bypass,
+        };
+        let cursor_pos = preedit.chars().count() as u32;
+        // A typed backtick can keep composition active without producing visible text.
+        let visible = !preedit.is_empty() || matches!(event.key, VirtualKey::Char(_));
+        KeyAction::UpdatePreedit {
+            text: preedit,
+            cursor_pos,
+            visible,
         }
     }
 }
@@ -273,6 +265,245 @@ pub fn translate(input: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_escape_cancels_composition() {
+        let escape = KeyEvent {
+            key: VirtualKey::Escape,
+            ctrl: false,
+            alt: false,
+            shift: false,
+            is_release: false,
+        };
+
+        for input in ["ami", "`"] {
+            let mut engine = PhoneticEngine::new();
+            for c in input.chars() {
+                engine.process_key_event(KeyEvent {
+                    key: VirtualKey::Char(c),
+                    ..escape
+                });
+            }
+            assert_eq!(engine.get_buffer(), input);
+            assert_eq!(
+                engine.process_key_event(escape),
+                KeyAction::UpdatePreedit {
+                    text: String::new(),
+                    cursor_pos: 0,
+                    visible: false,
+                }
+            );
+            assert!(engine.is_empty());
+            assert!(engine.bangla_mode);
+            assert_eq!(engine.process_key_event(escape), KeyAction::Bypass);
+
+            assert_eq!(
+                engine.process_key_event(KeyEvent {
+                    key: VirtualKey::Char('k'),
+                    ..escape
+                }),
+                KeyAction::UpdatePreedit {
+                    text: "ক".into(),
+                    cursor_pos: 1,
+                    visible: true,
+                }
+            );
+        }
+    }
+
+    #[test]
+    fn test_tab_commits_composition_once() {
+        let tab = KeyEvent {
+            key: VirtualKey::Tab,
+            ctrl: false,
+            alt: false,
+            shift: false,
+            is_release: false,
+        };
+
+        for (input, expected) in [("ami", "আমি"), ("vorrt`sonapUrrNo", "ভর্ৎসনাপূর্ণ"), ("`", "")]
+        {
+            let mut engine = PhoneticEngine::new();
+            engine.set_buffer(input.into());
+            assert_eq!(
+                engine.process_key_event(tab),
+                KeyAction::Commit {
+                    text: expected.into(),
+                    bypass_key: false,
+                }
+            );
+            assert!(engine.is_empty());
+            assert!(engine.bangla_mode);
+            assert_eq!(engine.process_key_event(tab), KeyAction::Bypass);
+            assert_eq!(
+                engine.process_key_event(KeyEvent {
+                    is_release: true,
+                    ..tab
+                }),
+                KeyAction::Bypass
+            );
+        }
+    }
+
+    #[test]
+    fn test_composition_controls_bypass_when_inactive() {
+        for (bangla_mode, buffer) in [(true, ""), (false, ""), (false, "ami")] {
+            for key in [VirtualKey::Escape, VirtualKey::Tab] {
+                let mut engine = PhoneticEngine::new();
+                engine.bangla_mode = bangla_mode;
+                engine.set_buffer(buffer.into());
+                assert_eq!(
+                    engine.process_key_event(KeyEvent {
+                        key,
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                        is_release: false,
+                    }),
+                    KeyAction::Bypass
+                );
+                assert_eq!(engine.get_buffer(), buffer);
+                assert_eq!(engine.bangla_mode, bangla_mode);
+            }
+        }
+    }
+
+    #[test]
+    fn test_modified_composition_controls_bypass() {
+        for key in [VirtualKey::Escape, VirtualKey::Tab] {
+            for (ctrl, alt, shift) in [
+                (true, false, false),
+                (false, true, false),
+                (false, false, true),
+                (true, true, true),
+            ] {
+                let mut engine = PhoneticEngine::new();
+                engine.set_buffer("ami".into());
+                assert_eq!(
+                    engine.process_key_event(KeyEvent {
+                        key,
+                        ctrl,
+                        alt,
+                        shift,
+                        is_release: false,
+                    }),
+                    KeyAction::Bypass
+                );
+                assert_eq!(engine.get_buffer(), "ami");
+                assert!(engine.bangla_mode);
+            }
+        }
+    }
+
+    #[test]
+    fn test_composition_control_releases_do_not_modify_buffer() {
+        for key in [VirtualKey::Escape, VirtualKey::Tab] {
+            for buffer in ["", "ami"] {
+                let mut engine = PhoneticEngine::new();
+                engine.set_buffer(buffer.into());
+                assert_eq!(
+                    engine.process_key_event(KeyEvent {
+                        key,
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                        is_release: true,
+                    }),
+                    KeyAction::Bypass
+                );
+                assert_eq!(engine.get_buffer(), buffer);
+                assert!(engine.bangla_mode);
+            }
+        }
+    }
+
+    #[test]
+    fn test_space_enter_and_punctuation_still_bypass_commit_key() {
+        for key in [VirtualKey::Space, VirtualKey::Enter, VirtualKey::Char('!')] {
+            let mut engine = PhoneticEngine::new();
+            engine.set_buffer("ami".into());
+            let event = KeyEvent {
+                key,
+                ctrl: false,
+                alt: false,
+                shift: false,
+                is_release: false,
+            };
+            assert_eq!(
+                engine.process_key_event(event),
+                KeyAction::Commit {
+                    text: "আমি".into(),
+                    bypass_key: true,
+                }
+            );
+            assert!(engine.is_empty());
+            assert_eq!(engine.process_key_event(event), KeyAction::Bypass);
+        }
+    }
+
+    #[test]
+    fn test_force_separate_preedit_visibility_and_backspace() {
+        let mut engine = PhoneticEngine::new();
+        let event = KeyEvent {
+            key: VirtualKey::Char('`'),
+            ctrl: false,
+            alt: false,
+            shift: false,
+            is_release: false,
+        };
+        assert_eq!(
+            engine.process_key_event(event),
+            KeyAction::UpdatePreedit {
+                text: String::new(),
+                cursor_pos: 0,
+                visible: true,
+            }
+        );
+        assert_eq!(engine.get_buffer(), "`");
+        let backspace = KeyEvent {
+            key: VirtualKey::Backspace,
+            ..event
+        };
+        assert_eq!(
+            engine.process_key_event(backspace),
+            KeyAction::UpdatePreedit {
+                text: String::new(),
+                cursor_pos: 0,
+                visible: false,
+            }
+        );
+        assert!(engine.is_empty());
+        assert_eq!(engine.process_key_event(backspace), KeyAction::Bypass);
+    }
+
+    #[test]
+    fn test_ctrl_space_still_toggles_mode_and_clears_composition() {
+        let mut engine = PhoneticEngine::new();
+        engine.set_buffer("ami".into());
+        let toggle = KeyEvent {
+            key: VirtualKey::Space,
+            ctrl: true,
+            alt: false,
+            shift: false,
+            is_release: false,
+        };
+        for bangla_mode in [false, true] {
+            assert_eq!(
+                engine.process_key_event(toggle),
+                KeyAction::ToggleMode { bangla_mode }
+            );
+            assert_eq!(engine.bangla_mode, bangla_mode);
+            assert!(engine.is_empty());
+            assert_eq!(
+                engine.process_key_event(KeyEvent {
+                    is_release: true,
+                    ..toggle
+                }),
+                KeyAction::Bypass
+            );
+            assert_eq!(engine.bangla_mode, bangla_mode);
+        }
+    }
 
     #[test]
     fn test_vowels() {

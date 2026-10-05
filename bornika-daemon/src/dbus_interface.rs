@@ -1,4 +1,4 @@
-use bornika_phonetic::PhoneticEngine;
+use bornika_phonetic::{KeyEvent, PhoneticEngine, VirtualKey};
 use std::collections::HashMap;
 use std::sync::Mutex;
 use zbus::zvariant::{ObjectPath, Value};
@@ -101,6 +101,33 @@ impl IBusFactory {
 
 // ----------------- IBusEngine -----------------
 
+fn decode_key_event(keyval: u32, state: u32) -> KeyEvent {
+    let key = match keyval {
+        // KeyEvent has no Mod3/Mod4/Mod5 or Super/Hyper/Meta fields; preserve these shortcuts.
+        0xFF1B | 0xFF09
+            if state & ((1 << 5) | (1 << 6) | (1 << 7) | (1 << 26) | (1 << 27) | (1 << 28))
+                != 0 =>
+        {
+            VirtualKey::Other
+        }
+        0xFF1B => VirtualKey::Escape,
+        0xFF09 => VirtualKey::Tab,
+        0xFF08 => VirtualKey::Backspace,
+        0x20 => VirtualKey::Space,
+        0xFF0D | 0xFF8D => VirtualKey::Enter,
+        0x21..=0x7E => VirtualKey::Char(keyval as u8 as char),
+        _ => VirtualKey::Other,
+    };
+
+    KeyEvent {
+        key,
+        ctrl: (state & 4) != 0,
+        alt: (state & 8) != 0,
+        shift: (state & 1) != 0,
+        is_release: (state & (1 << 30)) != 0,
+    }
+}
+
 pub struct IBusEngine {
     engine: Mutex<PhoneticEngine>,
 }
@@ -166,35 +193,16 @@ impl IBusEngine {
         keycode: u32,
         state: u32,
     ) -> bool {
-        let is_release = (state & (1 << 30)) != 0;
         let bangla_mode = {
             let engine = self.engine.lock().unwrap();
             engine.bangla_mode
         };
 
-        let key = if keyval == 0xFF08 {
-            bornika_phonetic::VirtualKey::Backspace
-        } else if keyval == 0x20 {
-            bornika_phonetic::VirtualKey::Space
-        } else if keyval == 0xFF0D || keyval == 0xFF8D {
-            bornika_phonetic::VirtualKey::Enter
-        } else if (0x20..=0x7E).contains(&keyval) {
-            bornika_phonetic::VirtualKey::Char(keyval as u8 as char)
-        } else {
-            bornika_phonetic::VirtualKey::Other
-        };
-
-        let event = bornika_phonetic::KeyEvent {
-            key,
-            ctrl: (state & 4) != 0,
-            alt: (state & 8) != 0,
-            shift: (state & 1) != 0,
-            is_release,
-        };
+        let event = decode_key_event(keyval, state);
 
         log_info(&format!(
             "Engine: ProcessKeyEvent (keyval: 0x{:X}, keycode: {}, state: 0x{:X}, is_release: {}, bangla_mode: {})",
-            keyval, keycode, state, is_release, bangla_mode
+            keyval, keycode, state, event.is_release, bangla_mode
         ));
 
         let action = {
@@ -245,4 +253,96 @@ impl IBusEngine {
         visible: bool,
         mode: u32,
     ) -> zbus::Result<()>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bornika_phonetic::KeyAction;
+
+    #[test]
+    fn test_ibus_escape_cancels_and_tab_commits() {
+        for (keyval, key, expected) in [
+            (
+                0xFF1B,
+                VirtualKey::Escape,
+                KeyAction::UpdatePreedit {
+                    text: String::new(),
+                    cursor_pos: 0,
+                    visible: false,
+                },
+            ),
+            (
+                0xFF09,
+                VirtualKey::Tab,
+                KeyAction::Commit {
+                    text: "আমি".into(),
+                    bypass_key: false,
+                },
+            ),
+        ] {
+            // Caps Lock and Num Lock must not turn these controls into shortcuts.
+            for state in [0, 2, 16, 18] {
+                let mut engine = PhoneticEngine::new();
+                for c in b"ami" {
+                    engine.process_key_event(decode_key_event(*c as u32, 0));
+                }
+                let event = decode_key_event(keyval, state);
+                assert_eq!(event.key, key);
+                assert_eq!(engine.process_key_event(event), expected.clone());
+                assert!(engine.is_empty());
+                assert_eq!(engine.process_key_event(event), KeyAction::Bypass);
+            }
+        }
+    }
+
+    #[test]
+    fn test_ibus_modified_controls_and_releases_bypass() {
+        for keyval in [0xFF1B, 0xFF09, 0xFE20] {
+            for state in [
+                0,
+                1,
+                4,
+                8,
+                1 << 5,
+                1 << 6,
+                1 << 7,
+                1 << 26,
+                1 << 27,
+                1 << 28,
+                1 << 30,
+            ] {
+                if state == 0 && keyval != 0xFE20 {
+                    continue;
+                }
+                let mut engine = PhoneticEngine::new();
+                engine.set_buffer("ami".into());
+                let event = decode_key_event(keyval, state);
+                assert_eq!(
+                    engine.process_key_event(event),
+                    KeyAction::Bypass,
+                    "keyval={keyval:#x}, state={state:#x}"
+                );
+                assert_eq!(engine.get_buffer(), "ami");
+                assert!(engine.bangla_mode);
+            }
+        }
+    }
+
+    #[test]
+    fn test_ibus_existing_commit_keys_still_pass_through() {
+        for keyval in [0x20, 0xFF0D, 0xFF8D, 0x21, 0x7E] {
+            let mut engine = PhoneticEngine::new();
+            engine.set_buffer("ami".into());
+            assert_eq!(
+                engine.process_key_event(decode_key_event(keyval, 0)),
+                KeyAction::Commit {
+                    text: "আমি".into(),
+                    bypass_key: true,
+                },
+                "keyval={keyval:#x}"
+            );
+            assert!(engine.is_empty());
+        }
+    }
 }

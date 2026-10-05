@@ -13,6 +13,7 @@ By connecting directly to the **IBus (Intelligent Input Bus)** framework over th
 * **Pure Rust Architecture:** Built using `tokio` and `zbus` to connect directly over D-Bus. No dynamic link bindings (`libibus-devel`, `glib2-devel`) are required to compile.
 * **On-the-Fly Toggle:** Press **`Super + Space`** within any active text input to toggle between English and Bangla phonetic modes.
 * **Real-time Composition Styling:** Displays uncommitted text inline with a composition underline, guaranteeing native visual feedback in modern editors (like VS Code, Chrome, Firefox, and GTK text fields).
+* **Composition Controls:** Press **`Escape`** to cancel uncommitted text or **`Tab`** to commit it without adding a space or changing focus. With no composition, both keys pass through normally; **`Shift + Tab`** remains available for backward focus navigation.
 * **Shortcut & Control Pass-through:** Standard layout operations (like `Ctrl + C`, `Ctrl + V`, `Ctrl + A`, `Space`, `Enter`) bypass phonetic interception automatically.
 
 ---
