@@ -234,7 +234,7 @@ dependencies = [
 
 [[package]]
 name = "bornika-daemon"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "bornika-phonetic",
  "serde",
@@ -244,7 +244,7 @@ dependencies = [
 
 [[package]]
 name = "bornika-phonetic"
-version = "0.0.6"
+version = "0.0.7"
 
 [[package]]
 name = "byteorder"
