@@ -36,7 +36,7 @@ Bornika follows the standard Avro phonetic transliteration guidelines:
 | `e` | এ | ে | `keno` $\rightarrow$ `কেন` |
 | `oi` / `OI` | ঐ | ৈ | `kOI` $\rightarrow$ `কৈ` |
 | `ou` / `OU` | ঔ | ৌ | `kOU` $\rightarrow$ `কৌ` |
-| `rri` | ঋ | ৃ | `krriho` $\rightarrow$ `গৃহ` |
+| `rri` | ঋ | ৃ | `krriShok` $\rightarrow$ `কৃষক` |
 
 ### Consonants & Signs
 | Key | Bengali | Key | Bengali | Key | Bengali |
