@@ -312,6 +312,42 @@ pub fn translate(input: &str) -> String {
 mod tests {
     use super::*;
 
+    const CONTROL_KEYS: [VirtualKey; 8] = [
+        VirtualKey::Backspace,
+        VirtualKey::Delete,
+        VirtualKey::Escape,
+        VirtualKey::Tab,
+        VirtualKey::Left,
+        VirtualKey::Right,
+        VirtualKey::Home,
+        VirtualKey::End,
+    ];
+
+    fn unmodified_press(key: VirtualKey) -> KeyEvent {
+        KeyEvent {
+            key,
+            ctrl: false,
+            alt: false,
+            shift: false,
+            is_release: false,
+        }
+    }
+
+    fn preedit(text: &str, cursor_pos: u32, visible: bool) -> KeyAction {
+        KeyAction::UpdatePreedit {
+            text: text.into(),
+            cursor_pos,
+            visible,
+        }
+    }
+
+    fn commit(text: &str, bypass_key: bool) -> KeyAction {
+        KeyAction::Commit {
+            text: text.into(),
+            bypass_key,
+        }
+    }
+
     #[test]
     fn test_navigation_clamps_at_composition_boundaries() {
         let mut engine = PhoneticEngine::default();
@@ -331,18 +367,8 @@ mod tests {
             (VirtualKey::End, 3),
         ] {
             assert_eq!(
-                engine.process_key_event(KeyEvent {
-                    key,
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
-                    is_release: false,
-                }),
-                KeyAction::UpdatePreedit {
-                    text: "আমি".into(),
-                    cursor_pos: expected_cursor,
-                    visible: true,
-                }
+                engine.process_key_event(unmodified_press(key)),
+                preedit("আমি", expected_cursor, true)
             );
             assert_eq!(engine.source_cursor, expected_cursor as usize);
             assert_eq!(engine.get_buffer(), "ami");
@@ -374,26 +400,14 @@ mod tests {
                 &[0, 1, 1, 1, 2, 2, 4, 5, 5, 6, 7, 8, 9, 9, 10, 12, 12],
             ),
         ];
-        let home = KeyEvent {
-            key: VirtualKey::Home,
-            ctrl: false,
-            alt: false,
-            shift: false,
-            is_release: false,
-        };
-
         for &(input, expected, positions) in cases {
             let mut engine = PhoneticEngine::default();
             engine.set_buffer(input.into());
             assert_eq!(positions.len(), input.chars().count() + 1);
             assert_eq!(translate(input), expected);
             assert_eq!(
-                engine.process_key_event(home),
-                KeyAction::UpdatePreedit {
-                    text: expected.into(),
-                    cursor_pos: 0,
-                    visible: !expected.is_empty(),
-                }
+                engine.process_key_event(unmodified_press(VirtualKey::Home)),
+                preedit(expected, 0, !expected.is_empty())
             );
 
             let steps = positions
@@ -411,12 +425,8 @@ mod tests {
                 );
             for (key, source, display) in steps {
                 assert_eq!(
-                    engine.process_key_event(KeyEvent { key, ..home }),
-                    KeyAction::UpdatePreedit {
-                        text: expected.into(),
-                        cursor_pos: display,
-                        visible: !expected.is_empty(),
-                    },
+                    engine.process_key_event(unmodified_press(key)),
+                    preedit(expected, display, !expected.is_empty()),
                     "input={input:?}, key={key:?}, source_cursor={source}"
                 );
                 let byte_offset = input
@@ -434,23 +444,16 @@ mod tests {
     #[test]
     fn test_buffer_set_and_clear_keep_byte_cursor_in_sync() {
         let mut engine = PhoneticEngine::default();
-        let home = KeyEvent {
-            key: VirtualKey::Home,
-            ctrl: false,
-            alt: false,
-            shift: false,
-            is_release: false,
-        };
         assert_eq!(engine.source_cursor, 0);
         engine.set_buffer("ক🙂kh".into());
         assert_eq!(engine.source_cursor, "ক🙂kh".len());
-        engine.process_key_event(home);
+        engine.process_key_event(unmodified_press(VirtualKey::Home));
         assert_eq!(engine.source_cursor, 0);
         engine.set_buffer("🙂".into());
         assert_eq!(engine.source_cursor, "🙂".len());
 
         engine.set_buffer("ami".into());
-        engine.process_key_event(home);
+        engine.process_key_event(unmodified_press(VirtualKey::Home));
         engine.clear();
         assert!(engine.is_empty());
         assert_eq!(engine.source_cursor, 0);
@@ -459,27 +462,16 @@ mod tests {
     }
 
     #[test]
-    fn test_navigation_bypasses_inactive_composition() {
+    fn test_controls_bypass_inactive_composition() {
         for (bangla_mode, buffer) in [(true, ""), (false, ""), (false, "ami")] {
-            for key in [
-                VirtualKey::Left,
-                VirtualKey::Right,
-                VirtualKey::Home,
-                VirtualKey::End,
-            ] {
+            for key in CONTROL_KEYS {
                 let mut engine = PhoneticEngine {
                     bangla_mode,
                     ..PhoneticEngine::default()
                 };
                 engine.set_buffer(buffer.into());
                 assert_eq!(
-                    engine.process_key_event(KeyEvent {
-                        key,
-                        ctrl: false,
-                        alt: false,
-                        shift: false,
-                        is_release: false,
-                    }),
+                    engine.process_key_event(unmodified_press(key)),
                     KeyAction::Bypass
                 );
                 assert_eq!(engine.get_buffer(), buffer);
@@ -490,13 +482,8 @@ mod tests {
     }
 
     #[test]
-    fn test_modified_navigation_preserves_composition_and_cursor() {
-        for key in [
-            VirtualKey::Left,
-            VirtualKey::Right,
-            VirtualKey::Home,
-            VirtualKey::End,
-        ] {
+    fn test_modified_controls_preserve_composition_and_cursor() {
+        for key in CONTROL_KEYS {
             for (ctrl, alt, shift) in [
                 (true, false, false),
                 (false, true, false),
@@ -517,97 +504,47 @@ mod tests {
                 );
                 assert_eq!(engine.source_cursor, 3);
                 assert_eq!(engine.get_buffer(), "ami");
+                assert!(engine.bangla_mode);
             }
         }
     }
 
     #[test]
-    fn test_navigation_releases_do_not_move_cursor() {
-        let home = KeyEvent {
-            key: VirtualKey::Home,
-            ctrl: false,
-            alt: false,
-            shift: false,
-            is_release: false,
-        };
-        for key in [
-            VirtualKey::Left,
-            VirtualKey::Right,
-            VirtualKey::Home,
-            VirtualKey::End,
-        ] {
-            let mut engine = PhoneticEngine::default();
-            engine.set_buffer("ami".into());
-            engine.process_key_event(home);
-            engine.process_key_event(KeyEvent {
-                key: VirtualKey::Right,
-                ..home
-            });
-            assert_eq!(engine.source_cursor, 1);
-            assert_eq!(
-                engine.process_key_event(KeyEvent {
-                    key,
-                    is_release: true,
-                    ..home
-                }),
-                KeyAction::Bypass
-            );
-            assert_eq!(engine.source_cursor, 1);
-            assert_eq!(engine.get_buffer(), "ami");
+    fn test_control_releases_preserve_composition_and_cursor() {
+        for key in CONTROL_KEYS {
+            for (buffer, cursor) in [("", 0), ("ami", 1), ("ami", 3)] {
+                let mut engine = PhoneticEngine::default();
+                engine.set_buffer(buffer.into());
+                engine.process_key_event(unmodified_press(VirtualKey::Home));
+                for _ in 0..cursor {
+                    engine.process_key_event(unmodified_press(VirtualKey::Right));
+                }
+                assert_eq!(engine.source_cursor, cursor);
+                assert_eq!(
+                    engine.process_key_event(KeyEvent {
+                        key,
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                        is_release: true,
+                    }),
+                    KeyAction::Bypass
+                );
+                assert_eq!(engine.source_cursor, cursor);
+                assert_eq!(engine.get_buffer(), buffer);
+                assert!(engine.bangla_mode);
+            }
         }
     }
 
     #[test]
     fn test_commit_cancel_and_toggle_reset_navigation_cursor() {
-        let home = KeyEvent {
-            key: VirtualKey::Home,
-            ctrl: false,
-            alt: false,
-            shift: false,
-            is_release: false,
-        };
         for (key, ctrl, expected) in [
-            (
-                VirtualKey::Tab,
-                false,
-                KeyAction::Commit {
-                    text: "ঋ".into(),
-                    bypass_key: false,
-                },
-            ),
-            (
-                VirtualKey::Space,
-                false,
-                KeyAction::Commit {
-                    text: "ঋ".into(),
-                    bypass_key: true,
-                },
-            ),
-            (
-                VirtualKey::Enter,
-                false,
-                KeyAction::Commit {
-                    text: "ঋ".into(),
-                    bypass_key: true,
-                },
-            ),
-            (
-                VirtualKey::Char('!'),
-                false,
-                KeyAction::Commit {
-                    text: "ঋ".into(),
-                    bypass_key: true,
-                },
-            ),
-            (
-                VirtualKey::Escape,
-                false,
-                KeyAction::UpdatePreedit {
-                    text: String::new(),
-                    cursor_pos: 0,
-                    visible: false,
-                },
-            ),
+            (VirtualKey::Tab, false, commit("ঋ", false)),
+            (VirtualKey::Space, false, commit("ঋ", true)),
+            (VirtualKey::Enter, false, commit("ঋ", true)),
+            (VirtualKey::Char('!'), false, commit("ঋ", true)),
+            (VirtualKey::Escape, false, preedit("", 0, false)),
             (
                 VirtualKey::Space,
                 true,
@@ -616,14 +553,17 @@ mod tests {
         ] {
             let mut engine = PhoneticEngine::default();
             engine.set_buffer("rri".into());
-            engine.process_key_event(home);
-            engine.process_key_event(KeyEvent {
-                key: VirtualKey::Right,
-                ..home
-            });
+            engine.process_key_event(unmodified_press(VirtualKey::Home));
+            engine.process_key_event(unmodified_press(VirtualKey::Right));
             assert_eq!(engine.source_cursor, 1);
             assert_eq!(
-                engine.process_key_event(KeyEvent { key, ctrl, ..home }),
+                engine.process_key_event(KeyEvent {
+                    key,
+                    ctrl,
+                    alt: false,
+                    shift: false,
+                    is_release: false,
+                }),
                 expected
             );
             assert!(engine.is_empty());
@@ -635,38 +575,17 @@ mod tests {
     fn test_typing_and_backspace_edit_at_navigation_cursor() {
         let mut engine = PhoneticEngine::default();
         engine.set_buffer("ami".into());
-        let home = KeyEvent {
-            key: VirtualKey::Home,
-            ctrl: false,
-            alt: false,
-            shift: false,
-            is_release: false,
-        };
-        engine.process_key_event(home);
+        engine.process_key_event(unmodified_press(VirtualKey::Home));
         assert_eq!(
-            engine.process_key_event(KeyEvent {
-                key: VirtualKey::Char('k'),
-                ..home
-            }),
-            KeyAction::UpdatePreedit {
-                text: "কামি".into(),
-                cursor_pos: 1,
-                visible: true,
-            }
+            engine.process_key_event(unmodified_press(VirtualKey::Char('k'))),
+            preedit("কামি", 1, true)
         );
         assert_eq!(engine.get_buffer(), "kami");
         assert_eq!(engine.source_cursor, 1);
 
         assert_eq!(
-            engine.process_key_event(KeyEvent {
-                key: VirtualKey::Backspace,
-                ..home
-            }),
-            KeyAction::UpdatePreedit {
-                text: "আমি".into(),
-                cursor_pos: 0,
-                visible: true,
-            }
+            engine.process_key_event(unmodified_press(VirtualKey::Backspace)),
+            preedit("আমি", 0, true)
         );
         assert_eq!(engine.get_buffer(), "ami");
         assert_eq!(engine.source_cursor, 0);
@@ -674,13 +593,6 @@ mod tests {
 
     #[test]
     fn test_cursor_edits_retranslate_tokens_and_preserve_unicode_boundaries() {
-        let home = KeyEvent {
-            key: VirtualKey::Home,
-            ctrl: false,
-            alt: false,
-            shift: false,
-            is_release: false,
-        };
         for (input, position, key, expected_buffer, expected_text, display, bytes) in [
             ("ka", 1, VirtualKey::Char('h'), "kha", "খা", 1, 2),
             ("kh", 1, VirtualKey::Char('`'), "k`h", "কহ", 1, 2),
@@ -704,20 +616,13 @@ mod tests {
         ] {
             let mut engine = PhoneticEngine::default();
             engine.set_buffer(input.into());
-            engine.process_key_event(home);
+            engine.process_key_event(unmodified_press(VirtualKey::Home));
             for _ in 0..position {
-                engine.process_key_event(KeyEvent {
-                    key: VirtualKey::Right,
-                    ..home
-                });
+                engine.process_key_event(unmodified_press(VirtualKey::Right));
             }
             assert_eq!(
-                engine.process_key_event(KeyEvent { key, ..home }),
-                KeyAction::UpdatePreedit {
-                    text: expected_text.into(),
-                    cursor_pos: display,
-                    visible: !expected_text.is_empty(),
-                },
+                engine.process_key_event(unmodified_press(key)),
+                preedit(expected_text, display, !expected_text.is_empty()),
                 "input={input:?}, position={position}, key={key:?}"
             );
             assert_eq!(engine.get_buffer(), expected_buffer);
@@ -732,13 +637,6 @@ mod tests {
     fn test_cursor_edits_commit_the_complete_word_and_reset() {
         let mut engine = PhoneticEngine::default();
         engine.set_buffer("kh".into());
-        let event = KeyEvent {
-            key: VirtualKey::Left,
-            ctrl: false,
-            alt: false,
-            shift: false,
-            is_release: false,
-        };
         for key in [
             VirtualKey::Left,
             VirtualKey::Char('`'),
@@ -746,43 +644,23 @@ mod tests {
             VirtualKey::End,
             VirtualKey::Char('a'),
         ] {
-            engine.process_key_event(KeyEvent { key, ..event });
+            engine.process_key_event(unmodified_press(key));
         }
         assert_eq!(engine.get_buffer(), "kha");
         assert_eq!(
-            engine.process_key_event(KeyEvent {
-                key: VirtualKey::Tab,
-                ..event
-            }),
-            KeyAction::Commit {
-                text: "খা".into(),
-                bypass_key: false,
-            }
+            engine.process_key_event(unmodified_press(VirtualKey::Tab)),
+            commit("খা", false)
         );
         assert!(engine.is_empty());
         assert_eq!(engine.source_cursor, 0);
         assert_eq!(
-            engine.process_key_event(KeyEvent {
-                key: VirtualKey::Char('g'),
-                ..event
-            }),
-            KeyAction::UpdatePreedit {
-                text: "গ".into(),
-                cursor_pos: 1,
-                visible: true,
-            }
+            engine.process_key_event(unmodified_press(VirtualKey::Char('g'))),
+            preedit("গ", 1, true)
         );
     }
 
     #[test]
     fn test_cursor_edits_match_character_model_at_every_utf8_boundary() {
-        let home = KeyEvent {
-            key: VirtualKey::Home,
-            ctrl: false,
-            alt: false,
-            shift: false,
-            is_release: false,
-        };
         for input in ["", "ami", "rri", "ক🙂kh", "e\u{301}kh"] {
             let source: Vec<char> = input.chars().collect();
             for position in 0..=source.len() {
@@ -793,12 +671,9 @@ mod tests {
                 ] {
                     let mut engine = PhoneticEngine::default();
                     engine.set_buffer(input.into());
-                    engine.process_key_event(home);
+                    engine.process_key_event(unmodified_press(VirtualKey::Home));
                     for _ in 0..position {
-                        engine.process_key_event(KeyEvent {
-                            key: VirtualKey::Right,
-                            ..home
-                        });
+                        engine.process_key_event(unmodified_press(VirtualKey::Right));
                     }
                     let mut expected = source.clone();
                     let mut cursor = position;
@@ -816,7 +691,7 @@ mod tests {
                         }
                         _ => {}
                     }
-                    engine.process_key_event(KeyEvent { key, ..home });
+                    engine.process_key_event(unmodified_press(key));
                     assert_eq!(engine.get_buffer(), expected.iter().collect::<String>());
                     assert_eq!(
                         engine.source_cursor,
@@ -835,169 +710,48 @@ mod tests {
 
     #[test]
     fn test_escape_cancels_composition() {
-        let escape = KeyEvent {
-            key: VirtualKey::Escape,
-            ctrl: false,
-            alt: false,
-            shift: false,
-            is_release: false,
-        };
+        let escape = unmodified_press(VirtualKey::Escape);
 
         for input in ["ami", "`"] {
             let mut engine = PhoneticEngine::default();
             for c in input.chars() {
-                engine.process_key_event(KeyEvent {
-                    key: VirtualKey::Char(c),
-                    ..escape
-                });
+                engine.process_key_event(unmodified_press(VirtualKey::Char(c)));
             }
             assert_eq!(engine.get_buffer(), input);
-            assert_eq!(
-                engine.process_key_event(escape),
-                KeyAction::UpdatePreedit {
-                    text: String::new(),
-                    cursor_pos: 0,
-                    visible: false,
-                }
-            );
+            assert_eq!(engine.process_key_event(escape), preedit("", 0, false));
             assert!(engine.is_empty());
             assert!(engine.bangla_mode);
             assert_eq!(engine.process_key_event(escape), KeyAction::Bypass);
 
             assert_eq!(
-                engine.process_key_event(KeyEvent {
-                    key: VirtualKey::Char('k'),
-                    ..escape
-                }),
-                KeyAction::UpdatePreedit {
-                    text: "ক".into(),
-                    cursor_pos: 1,
-                    visible: true,
-                }
+                engine.process_key_event(unmodified_press(VirtualKey::Char('k'))),
+                preedit("ক", 1, true)
             );
         }
     }
 
     #[test]
     fn test_tab_commits_composition_once() {
-        let tab = KeyEvent {
-            key: VirtualKey::Tab,
-            ctrl: false,
-            alt: false,
-            shift: false,
-            is_release: false,
-        };
+        let tab = unmodified_press(VirtualKey::Tab);
 
         for (input, expected) in [("ami", "আমি"), ("vorrt`sonapUrrNo", "ভর্ৎসনাপূর্ণ"), ("`", "")]
         {
             let mut engine = PhoneticEngine::default();
             engine.set_buffer(input.into());
-            assert_eq!(
-                engine.process_key_event(tab),
-                KeyAction::Commit {
-                    text: expected.into(),
-                    bypass_key: false,
-                }
-            );
+            assert_eq!(engine.process_key_event(tab), commit(expected, false));
             assert!(engine.is_empty());
             assert!(engine.bangla_mode);
             assert_eq!(engine.process_key_event(tab), KeyAction::Bypass);
             assert_eq!(
                 engine.process_key_event(KeyEvent {
+                    key: VirtualKey::Tab,
+                    ctrl: false,
+                    alt: false,
+                    shift: false,
                     is_release: true,
-                    ..tab
                 }),
                 KeyAction::Bypass
             );
-        }
-    }
-
-    #[test]
-    fn test_composition_controls_bypass_when_inactive() {
-        for (bangla_mode, buffer) in [(true, ""), (false, ""), (false, "ami")] {
-            for key in [
-                VirtualKey::Backspace,
-                VirtualKey::Delete,
-                VirtualKey::Escape,
-                VirtualKey::Tab,
-            ] {
-                let mut engine = PhoneticEngine {
-                    bangla_mode,
-                    ..PhoneticEngine::default()
-                };
-                engine.set_buffer(buffer.into());
-                assert_eq!(
-                    engine.process_key_event(KeyEvent {
-                        key,
-                        ctrl: false,
-                        alt: false,
-                        shift: false,
-                        is_release: false,
-                    }),
-                    KeyAction::Bypass
-                );
-                assert_eq!(engine.get_buffer(), buffer);
-                assert_eq!(engine.bangla_mode, bangla_mode);
-            }
-        }
-    }
-
-    #[test]
-    fn test_modified_composition_controls_bypass() {
-        for key in [
-            VirtualKey::Backspace,
-            VirtualKey::Delete,
-            VirtualKey::Escape,
-            VirtualKey::Tab,
-        ] {
-            for (ctrl, alt, shift) in [
-                (true, false, false),
-                (false, true, false),
-                (false, false, true),
-                (true, true, true),
-            ] {
-                let mut engine = PhoneticEngine::default();
-                engine.set_buffer("ami".into());
-                assert_eq!(
-                    engine.process_key_event(KeyEvent {
-                        key,
-                        ctrl,
-                        alt,
-                        shift,
-                        is_release: false,
-                    }),
-                    KeyAction::Bypass
-                );
-                assert_eq!(engine.get_buffer(), "ami");
-                assert!(engine.bangla_mode);
-            }
-        }
-    }
-
-    #[test]
-    fn test_composition_control_releases_do_not_modify_buffer() {
-        for key in [
-            VirtualKey::Backspace,
-            VirtualKey::Delete,
-            VirtualKey::Escape,
-            VirtualKey::Tab,
-        ] {
-            for buffer in ["", "ami"] {
-                let mut engine = PhoneticEngine::default();
-                engine.set_buffer(buffer.into());
-                assert_eq!(
-                    engine.process_key_event(KeyEvent {
-                        key,
-                        ctrl: false,
-                        alt: false,
-                        shift: false,
-                        is_release: true,
-                    }),
-                    KeyAction::Bypass
-                );
-                assert_eq!(engine.get_buffer(), buffer);
-                assert!(engine.bangla_mode);
-            }
         }
     }
 
@@ -1006,20 +760,8 @@ mod tests {
         for key in [VirtualKey::Space, VirtualKey::Enter, VirtualKey::Char('!')] {
             let mut engine = PhoneticEngine::default();
             engine.set_buffer("ami".into());
-            let event = KeyEvent {
-                key,
-                ctrl: false,
-                alt: false,
-                shift: false,
-                is_release: false,
-            };
-            assert_eq!(
-                engine.process_key_event(event),
-                KeyAction::Commit {
-                    text: "আমি".into(),
-                    bypass_key: true,
-                }
-            );
+            let event = unmodified_press(key);
+            assert_eq!(engine.process_key_event(event), commit("আমি", true));
             assert!(engine.is_empty());
             assert_eq!(engine.process_key_event(event), KeyAction::Bypass);
         }
@@ -1028,34 +770,13 @@ mod tests {
     #[test]
     fn test_force_separate_preedit_visibility_and_backspace() {
         let mut engine = PhoneticEngine::default();
-        let event = KeyEvent {
-            key: VirtualKey::Char('`'),
-            ctrl: false,
-            alt: false,
-            shift: false,
-            is_release: false,
-        };
         assert_eq!(
-            engine.process_key_event(event),
-            KeyAction::UpdatePreedit {
-                text: String::new(),
-                cursor_pos: 0,
-                visible: true,
-            }
+            engine.process_key_event(unmodified_press(VirtualKey::Char('`'))),
+            preedit("", 0, true)
         );
         assert_eq!(engine.get_buffer(), "`");
-        let backspace = KeyEvent {
-            key: VirtualKey::Backspace,
-            ..event
-        };
-        assert_eq!(
-            engine.process_key_event(backspace),
-            KeyAction::UpdatePreedit {
-                text: String::new(),
-                cursor_pos: 0,
-                visible: false,
-            }
-        );
+        let backspace = unmodified_press(VirtualKey::Backspace);
+        assert_eq!(engine.process_key_event(backspace), preedit("", 0, false));
         assert!(engine.is_empty());
         assert_eq!(engine.process_key_event(backspace), KeyAction::Bypass);
     }
@@ -1080,8 +801,11 @@ mod tests {
             assert!(engine.is_empty());
             assert_eq!(
                 engine.process_key_event(KeyEvent {
+                    key: VirtualKey::Space,
+                    ctrl: true,
+                    alt: false,
+                    shift: false,
                     is_release: true,
-                    ..toggle
                 }),
                 KeyAction::Bypass
             );
@@ -1163,29 +887,13 @@ mod tests {
                 is_release: false,
             });
             if c == '`' {
-                assert_eq!(
-                    action,
-                    KeyAction::UpdatePreedit {
-                        text: "ভর্ৎ".into(),
-                        cursor_pos: 4,
-                        visible: true,
-                    }
-                );
+                assert_eq!(action, preedit("ভর্ৎ", 4, true));
             }
         }
         assert_eq!(engine.translate(), "ভর্ৎসনাপূর্ণ");
         assert_eq!(
-            engine.process_key_event(KeyEvent {
-                key: VirtualKey::Space,
-                ctrl: false,
-                alt: false,
-                shift: false,
-                is_release: false,
-            }),
-            KeyAction::Commit {
-                text: "ভর্ৎসনাপূর্ণ".into(),
-                bypass_key: true,
-            }
+            engine.process_key_event(unmodified_press(VirtualKey::Space)),
+            commit("ভর্ৎসনাপূর্ণ", true)
         );
         assert!(engine.is_empty());
     }

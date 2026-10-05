@@ -324,73 +324,78 @@ mod tests {
                 .await
                 .unwrap();
 
-            let cases = [
+            enum ExpectedSignal {
+                Preedit(&'static str, u32, bool),
+                Commit(&'static str),
+            }
+
+            let cases: &[(u32, u32, bool, &[ExpectedSignal])] = &[
                 (
                     b'k' as u32,
-                    0u32,
+                    0,
                     true,
-                    vec![("UpdatePreeditText", "ক", 1, true)],
+                    &[ExpectedSignal::Preedit("ক", 1, true)],
                 ),
                 (
                     b'h' as u32,
                     0,
                     true,
-                    vec![("UpdatePreeditText", "খ", 1, true)],
+                    &[ExpectedSignal::Preedit("খ", 1, true)],
                 ),
-                (0xFF51, 0, true, vec![("UpdatePreeditText", "খ", 0, true)]),
-                (0xFF51, 1 << 30, false, vec![]),
-                (0xFF53, 0, true, vec![("UpdatePreeditText", "খ", 1, true)]),
+                (0xFF51, 0, true, &[ExpectedSignal::Preedit("খ", 0, true)]),
+                (0xFF51, 1 << 30, false, &[]),
+                (0xFF53, 0, true, &[ExpectedSignal::Preedit("খ", 1, true)]),
                 (
                     0xFF09,
                     0,
                     true,
-                    vec![
-                        ("UpdatePreeditText", "", 0, false),
-                        ("CommitText", "খ", 0, false),
+                    &[
+                        ExpectedSignal::Preedit("", 0, false),
+                        ExpectedSignal::Commit("খ"),
                     ],
                 ),
-                (0xFF09, 1 << 30, false, vec![]),
+                (0xFF09, 1 << 30, false, &[]),
                 (
                     b'a' as u32,
                     0,
                     true,
-                    vec![("UpdatePreeditText", "আ", 1, true)],
+                    &[ExpectedSignal::Preedit("আ", 1, true)],
                 ),
                 (
                     b'm' as u32,
                     0,
                     true,
-                    vec![("UpdatePreeditText", "আম", 2, true)],
+                    &[ExpectedSignal::Preedit("আম", 2, true)],
                 ),
                 (
                     b'i' as u32,
                     0,
                     true,
-                    vec![("UpdatePreeditText", "আমি", 3, true)],
+                    &[ExpectedSignal::Preedit("আমি", 3, true)],
                 ),
-                (0xFF50, 0, true, vec![("UpdatePreeditText", "আমি", 0, true)]),
-                (0xFFFF, 0, true, vec![("UpdatePreeditText", "মি", 0, true)]),
+                (0xFF50, 0, true, &[ExpectedSignal::Preedit("আমি", 0, true)]),
+                (0xFFFF, 0, true, &[ExpectedSignal::Preedit("মি", 0, true)]),
                 (
                     b'a' as u32,
                     0,
                     true,
-                    vec![("UpdatePreeditText", "আমি", 1, true)],
+                    &[ExpectedSignal::Preedit("আমি", 1, true)],
                 ),
-                (0xFF53, 0, true, vec![("UpdatePreeditText", "আমি", 2, true)]),
-                (0xFF08, 0, true, vec![("UpdatePreeditText", "আই", 1, true)]),
+                (0xFF53, 0, true, &[ExpectedSignal::Preedit("আমি", 2, true)]),
+                (0xFF08, 0, true, &[ExpectedSignal::Preedit("আই", 1, true)]),
                 (
                     b'm' as u32,
                     0,
                     true,
-                    vec![("UpdatePreeditText", "আমি", 2, true)],
+                    &[ExpectedSignal::Preedit("আমি", 2, true)],
                 ),
-                (0xFF9F, 0, true, vec![("UpdatePreeditText", "আম", 2, true)]),
-                (0xFF1B, 0, true, vec![("UpdatePreeditText", "", 0, false)]),
-                (0xFF1B, 1 << 30, false, vec![]),
-                (0xFF09, 0, false, vec![]),
+                (0xFF9F, 0, true, &[ExpectedSignal::Preedit("আম", 2, true)]),
+                (0xFF1B, 0, true, &[ExpectedSignal::Preedit("", 0, false)]),
+                (0xFF1B, 1 << 30, false, &[]),
+                (0xFF09, 0, false, &[]),
             ];
 
-            for (keyval, state, handled, expected) in cases {
+            for &(keyval, state, handled, expected) in cases {
                 let reply = client
                     .call_method(
                         None::<&str>,
@@ -408,17 +413,24 @@ mod tests {
                     .await
                     .unwrap();
 
-                for (member, text, cursor, visible) in expected {
+                for signal in expected {
                     let message = signals.try_next().await.unwrap().unwrap();
-                    assert_eq!(message.member().unwrap().as_str(), member);
-                    if member == "CommitText" {
-                        let value = message.body::<OwnedValue>().unwrap();
-                        assert_ibus_text(&value, text, false);
-                    } else {
-                        let (value, actual_cursor, actual_visible, mode) =
-                            message.body::<(OwnedValue, u32, bool, u32)>().unwrap();
-                        assert_ibus_text(&value, text, visible);
-                        assert_eq!((actual_cursor, actual_visible, mode), (cursor, visible, 0));
+                    match signal {
+                        ExpectedSignal::Commit(text) => {
+                            assert_eq!(message.member().unwrap().as_str(), "CommitText");
+                            let value = message.body::<OwnedValue>().unwrap();
+                            assert_ibus_text(&value, text, false);
+                        }
+                        ExpectedSignal::Preedit(text, cursor, visible) => {
+                            assert_eq!(message.member().unwrap().as_str(), "UpdatePreeditText");
+                            let (value, actual_cursor, actual_visible, mode) =
+                                message.body::<(OwnedValue, u32, bool, u32)>().unwrap();
+                            assert_ibus_text(&value, text, *visible);
+                            assert_eq!(
+                                (actual_cursor, actual_visible, mode),
+                                (*cursor, *visible, 0)
+                            );
+                        }
                     }
                 }
                 let barrier = signals.try_next().await.unwrap().unwrap();
@@ -467,7 +479,10 @@ mod tests {
 
     #[test]
     fn test_ibus_modified_controls_and_releases_bypass() {
-        for keyval in [0xFF08, 0xFFFF, 0xFF9F, 0xFF1B, 0xFF09, 0xFE20] {
+        for keyval in [
+            0xFF08, 0xFFFF, 0xFF9F, 0xFF1B, 0xFF09, 0xFE20, 0xFF51, 0xFF96, 0xFF53, 0xFF98, 0xFF50,
+            0xFF95, 0xFF57, 0xFF9C,
+        ] {
             for state in [
                 0,
                 1,
@@ -544,36 +559,6 @@ mod tests {
                     );
                     assert_eq!(engine.get_buffer(), "ami");
                 }
-            }
-        }
-    }
-
-    #[test]
-    fn test_ibus_modified_navigation_and_releases_bypass() {
-        for keyval in [
-            0xFF51, 0xFF96, 0xFF53, 0xFF98, 0xFF50, 0xFF95, 0xFF57, 0xFF9C,
-        ] {
-            for state in [
-                1,
-                4,
-                8,
-                1 << 5,
-                1 << 6,
-                1 << 7,
-                1 << 26,
-                1 << 27,
-                1 << 28,
-                1 << 30,
-            ] {
-                let mut engine = PhoneticEngine::default();
-                engine.set_buffer("ami".into());
-                assert_eq!(
-                    engine.process_key_event(decode_key_event(keyval, state)),
-                    KeyAction::Bypass,
-                    "keyval={keyval:#x}, state={state:#x}"
-                );
-                assert_eq!(engine.get_buffer(), "ami");
-                assert!(engine.bangla_mode);
             }
         }
     }
