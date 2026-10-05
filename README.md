@@ -14,6 +14,7 @@ By connecting directly to the **IBus (Intelligent Input Bus)** framework over th
 * **On-the-Fly Toggle:** Press **`Super + Space`** within any active text input to toggle between English and Bangla phonetic modes.
 * **Real-time Composition Styling:** Displays uncommitted text inline with a composition underline, guaranteeing native visual feedback in modern editors (like VS Code, Chrome, Firefox, and GTK text fields).
 * **Composition Controls:** Press **`Escape`** to cancel uncommitted text or **`Tab`** to commit it without adding a space or changing focus. With no composition, both keys pass through normally; **`Shift + Tab`** remains available for backward focus navigation.
+* **Composition Editing:** **`Left` / `Right`** move through the original phonetic input; **`Home` / `End`** move to its boundaries. Typing inserts at the cursor, **`Backspace`** removes the preceding input character, and **`Delete`** removes the following one. Inside multi-letter matches such as `kh`, the displayed caret snaps to the start of the Bangla token. Modified editing/navigation keys pass through to the application.
 * **Shortcut & Control Pass-through:** Standard layout operations (like `Ctrl + C`, `Ctrl + V`, `Ctrl + A`, `Space`, `Enter`) bypass phonetic interception automatically.
 
 ---
